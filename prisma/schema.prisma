@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("VIDEO_DB_URL")
+}
+
+model Project {
+  id                String      @id @default(cuid())
+  title             String
+  idea              String
+  format            String      @default("horizontal") // vertical | horizontal | square
+  targetAspectRatio String      @default("16:9")        // 16:9 | 9:16 | 1:1
+  targetWidth       Int         @default(832)
+  targetHeight      Int         @default(480)
+  status            String      @default("created")     // created | storyboarded | rendering | assembled | failed
+  shotCount         Int?
+  outputPath        String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  shots      Shot[]
+  storyboard Storyboard?
+}
+
+model Storyboard {
+  id          String   @id @default(cuid())
+  projectId   String   @unique
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  rawJson     String
+  llmProvider String
+  llmModel    String
+  retryCount  Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+model Shot {
+  id              String         @id @default(cuid())
+  projectId       String
+  project         Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  shotIndex       Int
+  prompt          String
+  negativePrompt  String         @default("")
+  durationSeconds Float          @default(3.0)
+  cameraMotion    String?
+  mood            String?
+  reframeFocus    String         @default("center")  // center | left | right | upper | lower
+  reframePan      String         @default("none")    // none | slow_ltr | slow_rtl
+  status          String         @default("pending") // pending | queued | rendering | rendered | failed | premium_routed
+  renderPath      String?
+  renderEngine    String?
+  qcScore         Float?
+  qcFailCount     Int            @default(0)
+  comfyuiPromptId String?
+  errorMessage    String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  renderJobs    RenderJob[]
+  premiumAudits PremiumAudit[]
+
+  @@unique([projectId, shotIndex])
+}
+
+model RenderJob {
+  id           String    @id @default(cuid())
+  shotId       String
+  shot         Shot      @relation(fields: [shotId], references: [id], onDelete: Cascade)
+  bullmqJobId  String?
+  status       String    @default("queued") // queued | processing | completed | failed
+  engine       String
+  attempt      Int       @default(1)
+  startedAt    DateTime?
+  completedAt  DateTime?
+  errorMessage String?
+  durationMs   Int?
+  createdAt    DateTime  @default(now())
+}
+
+model PremiumAudit {
+  id                   String    @id @default(cuid())
+  shotId               String
+  shot                 Shot      @relation(fields: [shotId], references: [id], onDelete: Cascade)
+  provider             String
+  premiumTriggerReason String
+  requestId            String?
+  estimatedCost        Float?
+  actualCost           Float?
+  requestPayload       String?
+  responseMetadata     String?
+  status               String    @default("requested") // requested | processing | completed | failed
+  createdAt            DateTime  @default(now())
+  completedAt          DateTime?
+}

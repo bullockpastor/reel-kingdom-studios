@@ -1,0 +1,25 @@
+node_modules/
+dist/
+*.js
+*.d.ts
+*.js.map
+!src/**
+!prisma/**
+
+# Environment
+.env
+.env.local
+
+# Prisma
+prisma/migrations/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
