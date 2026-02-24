@@ -32,3 +32,13 @@ export function projectShotsDir(projectId: string): string {
 export function projectOutputDir(projectId: string): string {
   return join(config.STUDIO_ROOT, projectId, "output");
 }
+
+export function shotRenderDir(
+  projectId: string,
+  shotId: string,
+  tier: "draft" | "final" = "draft"
+): string {
+  const dir = join(config.STUDIO_ROOT, projectId, "shots", shotId, "renders", tier);
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}

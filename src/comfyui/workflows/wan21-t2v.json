@@ -2,7 +2,7 @@
   "37": {
     "class_type": "UNETLoader",
     "inputs": {
-      "unet_name": "wan2.1_t2v_14B_fp16.safetensors",
+      "unet_name": "wan2.1_t2v_1.3B_fp16.safetensors",
       "weight_dtype": "default"
     }
   },
@@ -10,7 +10,8 @@
     "class_type": "CLIPLoader",
     "inputs": {
       "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
-      "type": "wan"
+      "type": "wan",
+      "device": "default"
     }
   },
   "39": {
@@ -56,7 +57,7 @@
       "steps": {{STEPS}},
       "cfg": {{CFG}},
       "sampler_name": "{{SAMPLER}}",
-      "scheduler": "normal",
+      "scheduler": "simple",
       "denoise": 1,
       "model": ["48", 0],
       "positive": ["6", 0],
@@ -71,16 +72,20 @@
       "vae": ["39", 0]
     }
   },
-  "47": {
-    "class_type": "VHS_VideoCombine",
+  "50": {
+    "class_type": "CreateVideo",
     "inputs": {
-      "frame_rate": {{FPS}},
-      "loop_count": 0,
+      "images": ["8", 0],
+      "fps": {{FPS}}
+    }
+  },
+  "51": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": ["50", 0],
       "filename_prefix": "{{FILENAME_PREFIX}}",
-      "format": "video/webm",
-      "pingpong": false,
-      "save_output": true,
-      "images": ["8", 0]
+      "format": "mp4",
+      "codec": "h264"
     }
   }
 }

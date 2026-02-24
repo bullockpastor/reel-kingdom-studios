@@ -34,16 +34,14 @@ export class ComfyUIRenderer implements VideoRenderer {
       logger.info({ shotId: request.shotId, promptId }, "Polling for completion");
       const history = await this.client.pollUntilComplete(promptId);
 
-      // Find the output file
-      const outputNode = Object.values(history.outputs).find(
-        (node) => node.images && node.images.length > 0
-      );
+      // Find the output file (videos from SaveVideo, or images from SaveAnimatedWEBP)
+      const outputFile = this.client.findOutputFile(history);
 
-      if (!outputNode?.images?.[0]) {
+      if (!outputFile) {
         throw new Error("ComfyUI completed but produced no output files");
       }
 
-      const { filename, subfolder } = outputNode.images[0];
+      const { filename, subfolder } = outputFile;
       const filePath = await this.client.downloadOutput(filename, subfolder, request.outputDir);
 
       const durationMs = Date.now() - start;

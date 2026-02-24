@@ -1,8 +1,22 @@
+import { writeFile, mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
 
-interface HistoryEntry {
-  outputs: Record<string, { images?: Array<{ filename: string; subfolder: string; type: string }> }>;
+interface OutputFile {
+  filename: string;
+  subfolder: string;
+  type: string;
+}
+
+interface NodeOutput {
+  images?: OutputFile[];
+  videos?: OutputFile[];
+  gifs?: OutputFile[];
+}
+
+export interface HistoryEntry {
+  outputs: Record<string, NodeOutput>;
   status: { status_str: string; completed: boolean };
 }
 
@@ -57,6 +71,26 @@ export class ComfyUIClient {
     throw new Error(`ComfyUI render timed out after ${timeoutMs / 1000}s for prompt ${promptId}`);
   }
 
+  /**
+   * Find the first video/image output file from a completed history entry.
+   */
+  findOutputFile(history: HistoryEntry): OutputFile | null {
+    for (const nodeOutput of Object.values(history.outputs)) {
+      // Check videos first (SaveVideo, SaveWEBM)
+      if (nodeOutput.videos && nodeOutput.videos.length > 0) {
+        return nodeOutput.videos[0];
+      }
+      // Fall back to gifs/images (SaveAnimatedWEBP, etc.)
+      if (nodeOutput.gifs && nodeOutput.gifs.length > 0) {
+        return nodeOutput.gifs[0];
+      }
+      if (nodeOutput.images && nodeOutput.images.length > 0) {
+        return nodeOutput.images[0];
+      }
+    }
+    return null;
+  }
+
   async downloadOutput(filename: string, subfolder: string, outputDir: string): Promise<string> {
     const url = `${this.baseUrl}/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=output`;
     const response = await fetch(url);
@@ -65,27 +99,26 @@ export class ComfyUIClient {
       throw new Error(`ComfyUI /view returned ${response.status}`);
     }
 
-    const { writeFile } = await import("node:fs/promises");
-    const { join } = await import("node:path");
+    await mkdir(outputDir, { recursive: true });
     const buffer = Buffer.from(await response.arrayBuffer());
     const outputPath = join(outputDir, filename);
     await writeFile(outputPath, buffer);
     return outputPath;
   }
 
-  async getSystemStats(): Promise<Record<string, unknown>> {
-    const response = await fetch(`${this.baseUrl}/system_stats`);
-    if (!response.ok) throw new Error(`ComfyUI /system_stats returned ${response.status}`);
-    return (await response.json()) as Record<string, unknown>;
-  }
-
   async healthCheck(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/system_stats`);
+      const response = await fetch(`${this.baseUrl}/queue`);
       return response.ok;
     } catch {
       return false;
     }
+  }
+
+  async getQueue(): Promise<{ queue_running: unknown[]; queue_pending: unknown[] }> {
+    const response = await fetch(`${this.baseUrl}/queue`);
+    if (!response.ok) throw new Error(`ComfyUI /queue returned ${response.status}`);
+    return (await response.json()) as { queue_running: unknown[]; queue_pending: unknown[] };
   }
 
   async interrupt(): Promise<void> {

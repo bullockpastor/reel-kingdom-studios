@@ -1,3 +1,5 @@
+import { accessSync, constants } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { config } from "../config.js";
 
 interface ServiceStatus {
@@ -18,7 +20,7 @@ async function checkOllama(): Promise<ServiceStatus> {
 
 async function checkComfyUI(): Promise<ServiceStatus> {
   try {
-    const resp = await fetch(`${config.COMFYUI_URL}/system_stats`);
+    const resp = await fetch(`${config.COMFYUI_URL}/queue`);
     if (resp.ok) return { name: "ComfyUI", status: "ok" };
     return { name: "ComfyUI", status: "down", message: `HTTP ${resp.status}` };
   } catch {
@@ -39,7 +41,6 @@ async function checkRedis(): Promise<ServiceStatus> {
 
 function checkStudioRoot(): ServiceStatus {
   try {
-    const { accessSync, constants } = require("node:fs");
     accessSync(config.STUDIO_ROOT, constants.W_OK);
     return { name: "STUDIO_ROOT", status: "ok" };
   } catch {
@@ -49,7 +50,6 @@ function checkStudioRoot(): ServiceStatus {
 
 function checkFFmpeg(): ServiceStatus {
   try {
-    const { execFileSync } = require("node:child_process");
     execFileSync(config.FFMPEG_PATH, ["-version"], { timeout: 5000 });
     return { name: "FFmpeg", status: "ok" };
   } catch {

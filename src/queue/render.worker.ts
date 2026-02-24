@@ -4,6 +4,7 @@ import type { RenderJobData } from "./render.queue.js";
 import { db } from "../db.js";
 import { getLocalRenderer, getPremiumRenderer } from "../providers/video/index.js";
 import { runAgent, visualQCAgent } from "../agents/index.js";
+import { shotRenderDir } from "../storage/studio-root.js";
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
 
@@ -29,6 +30,7 @@ const worker = new Worker<RenderJobData>(
     try {
       if (data.engine === "comfyui") {
         const renderer = getLocalRenderer();
+        const renderDir = shotRenderDir(data.projectId, data.shotId, "draft");
         const result = await renderer.render({
           shotId: data.shotId,
           prompt: data.prompt,
@@ -39,7 +41,7 @@ const worker = new Worker<RenderJobData>(
           fps: data.fps,
           steps: data.steps,
           seed: data.seed,
-          outputDir: data.outputDir,
+          outputDir: renderDir,
           filenamePrefix: `shot_${data.shotId}`,
         });
 

@@ -36,3 +36,7 @@ const configSchema = z.object({
 
 export type Config = z.infer<typeof configSchema>;
 export const config: Config = configSchema.parse(process.env);
+
+export const STUDIO_NAME = "Reel Kingdom Studios";
+export const STUDIO_TAGLINE = "Local-First Cinematic Intelligence Platform";
+export const STUDIO_VERSION = "0.1.0";

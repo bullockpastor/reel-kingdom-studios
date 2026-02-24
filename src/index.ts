@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import { config } from "./config.js";
+import { config, STUDIO_NAME, STUDIO_TAGLINE } from "./config.js";
 import { logger } from "./utils/logger.js";
 import { ensureStudioRoot } from "./storage/studio-root.js";
 import { runHealthChecks } from "./utils/health-check.js";
@@ -14,7 +14,7 @@ app.register(cors);
 // Health check — full dependency status
 app.get("/health", async () => {
   const { healthy, services } = await runHealthChecks();
-  return { healthy, services, timestamp: new Date().toISOString() };
+  return { studio: STUDIO_NAME, tagline: STUDIO_TAGLINE, healthy, services, timestamp: new Date().toISOString() };
 });
 
 // Routes
@@ -33,7 +33,8 @@ async function start() {
   try {
     ensureStudioRoot();
     await app.listen({ port: config.PORT, host: "0.0.0.0" });
-    logger.info(`Video Studio Platform running on http://0.0.0.0:${config.PORT}`);
+    logger.info(`${STUDIO_NAME} initialized.`);
+    logger.info("Local-first cinematic intelligence platform ready.");
 
     // Log dependency status on startup
     const { services } = await runHealthChecks();

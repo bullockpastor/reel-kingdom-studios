@@ -92,8 +92,9 @@ export async function generateStoryboard(
     }>;
   };
 
-  if (!safetyOutput.approved) {
-    const blockFlags = safetyOutput.flags.filter((f) => f.severity === "block");
+  // Only hard-block if there are "block"-severity flags
+  const blockFlags = safetyOutput.flags.filter((f) => f.severity === "block");
+  if (blockFlags.length > 0) {
     throw new Error(
       `Safety review blocked the storyboard: ${blockFlags.map((f) => f.issue).join("; ")}`
     );
