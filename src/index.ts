@@ -10,6 +10,8 @@ import { projectRoutes } from "./routes/projects.js";
 import { shotRoutes } from "./routes/shots.js";
 import { assetRoutes } from "./routes/assets.js";
 import { queueRoutes } from "./routes/queue.js";
+import "./queue/render.worker.js";
+import "./queue/assembly.worker.js";
 
 const app = Fastify({ logger: false });
 
