@@ -1,15 +1,43 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import fastifyStatic from "@fastify/static";
+import { join } from "node:path";
 import { config, STUDIO_NAME, STUDIO_TAGLINE } from "./config.js";
 import { logger } from "./utils/logger.js";
 import { ensureStudioRoot } from "./storage/studio-root.js";
 import { runHealthChecks } from "./utils/health-check.js";
 import { projectRoutes } from "./routes/projects.js";
 import { shotRoutes } from "./routes/shots.js";
+import { assetRoutes } from "./routes/assets.js";
+import { queueRoutes } from "./routes/queue.js";
 
 const app = Fastify({ logger: false });
 
 app.register(cors);
+
+// Serve the React SPA from client/dist/
+app.register(fastifyStatic, {
+  root: join(process.cwd(), "client", "dist"),
+  prefix: "/studio/",
+  decorateReply: true,
+  wildcard: false,
+});
+
+// SPA catch-all: /studio bare redirects to /studio/
+app.get("/studio", async (_request, reply) => {
+  return reply.redirect("/studio/");
+});
+
+// SPA fallback: any /studio/* path that isn't a static asset serves index.html
+// Must be an explicit route (not setNotFoundHandler) so it runs in the same scope
+// as the @fastify/static registration and reply.sendFile is available.
+app.get("/studio/*", async (_request, reply) => {
+  return reply.sendFile("index.html");
+});
+
+app.setNotFoundHandler(async (_request, reply) => {
+  reply.status(404).send({ error: "Not found" });
+});
 
 // Health check — full dependency status
 app.get("/health", async () => {
@@ -17,9 +45,11 @@ app.get("/health", async () => {
   return { studio: STUDIO_NAME, tagline: STUDIO_TAGLINE, healthy, services, timestamp: new Date().toISOString() };
 });
 
-// Routes
+// API Routes
 app.register(projectRoutes, { prefix: "/projects" });
 app.register(shotRoutes, { prefix: "/shots" });
+app.register(assetRoutes, { prefix: "/assets" });
+app.register(queueRoutes, { prefix: "/queue" });
 
 // Global error handler
 app.setErrorHandler((error: Error, _request, reply) => {

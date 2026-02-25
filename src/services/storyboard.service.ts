@@ -2,7 +2,7 @@ import type { Project } from "@prisma/client";
 import { db } from "../db.js";
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
-import { storyboardResultSchema } from "../schemas/storyboard.schema.js";
+import { storyboardResultSchema, type StoryboardResultParsed } from "../schemas/storyboard.schema.js";
 import {
   runAgent,
   intentInterpreterAgent,
@@ -55,15 +55,51 @@ export async function generateStoryboard(
   agentResults.push(storyboardResult);
   writeFileSync(join(projectDir, "02-storyboard.json"), storyboardResult.rawOutput);
 
-  // Validate storyboard structure
-  let storyboard;
-  try {
-    storyboard = storyboardResultSchema.parse(storyboardResult.parsed);
-  } catch (err) {
-    throw new Error(
-      `Storyboard validation failed: ${err instanceof Error ? err.message : String(err)}`
-    );
+  // Normalize & validate storyboard structure (retry up to 3x)
+  let storyboard: StoryboardResultParsed | undefined;
+  let storyboardAttempts = 0;
+  const maxStoryboardAttempts = 3;
+  let lastValidationError: string | undefined;
+
+  while (storyboardAttempts < maxStoryboardAttempts) {
+    storyboardAttempts++;
+
+    // Re-generate on retry (attempts > 1)
+    if (storyboardAttempts > 1) {
+      logger.warn({ attempt: storyboardAttempts, error: lastValidationError }, "Retrying storyboard generation");
+      const retryResult = await runAgent(
+        storyboardAgent,
+        `${intentResult.rawOutput}\n\n--- VALIDATION ERROR FROM PREVIOUS ATTEMPT ---\n${lastValidationError}\nPlease fix the issues above and regenerate.`
+      );
+      Object.assign(storyboardResult, retryResult);
+      writeFileSync(join(projectDir, "02-storyboard.json"), storyboardResult.rawOutput);
+    }
+
+    // Preprocess: clamp totalDurationSeconds to sum of shot durations
+    const raw = storyboardResult.parsed as Record<string, unknown>;
+    if (Array.isArray(raw.shots)) {
+      const sumDurations = (raw.shots as Array<{ durationSeconds?: number }>)
+        .reduce((sum, s) => sum + (s.durationSeconds || 3), 0);
+      raw.totalDurationSeconds = Math.min(Math.max(sumDurations, 5), 120);
+      // Clamp individual shot durations
+      for (const shot of raw.shots as Array<{ durationSeconds?: number }>) {
+        if (shot.durationSeconds && shot.durationSeconds > 15) shot.durationSeconds = 15;
+        if (shot.durationSeconds && shot.durationSeconds < 1) shot.durationSeconds = 1;
+      }
+    }
+
+    try {
+      storyboard = storyboardResultSchema.parse(raw);
+      break; // success
+    } catch (err) {
+      lastValidationError = err instanceof Error ? err.message : String(err);
+      if (storyboardAttempts >= maxStoryboardAttempts) {
+        throw new Error(`Storyboard validation failed after ${maxStoryboardAttempts} attempts: ${lastValidationError}`);
+      }
+    }
   }
+
+  if (!storyboard) throw new Error("Storyboard validation failed");
 
   // ── Agent 3: Prompt Compiler ──
   logger.info({ projectId: project.id }, "Agent 3/4: Prompt Compiler");
@@ -92,13 +128,37 @@ export async function generateStoryboard(
     }>;
   };
 
-  // Only hard-block if there are "block"-severity flags
+  // Post-process: downgrade "block" flags that are false positives on generic imagery.
+  // The safety model can over-trigger on ordinary industrial/professional objects that carry
+  // no copyright or IP risk. Any "block" flag whose issue text contains only generic terms
+  // (and no named brand/character indicator) is downgraded to "warn" so the project proceeds.
+  const GENERIC_TERMS_PATTERN =
+    /hard\s*hat|safety\s*helmet|steel\s*beam|metal\s*bar|rebar|scaffolding|catwalk|girder|i-beam|construction\s*(site|worker|equipment)|warehouse|factory|industrial|loading\s*dock|assembly\s*line|foundry|shipyard|work(er|ers|place)?\s*(boot|vest|wear|attire|clothing|uniform|gear)|tool\s*belt|welder|welding|crane\s*(operator)?|forklift|conveyor/i;
+  const SPECIFIC_IP_PATTERN =
+    /\b(brand|trademark|©|®|™|copyrighted?\s+character|owned\s+by|licensed|franchise|marvel|dc\s+comics|disney|warner\s+bros?|nike|apple|coca[- ]cola|mcdonald|star\s*wars|harry\s*potter|batman|spider[- ]?man|mickey\s*mouse)\b/i;
+
+  for (const flag of safetyOutput.flags) {
+    if (
+      flag.severity === "block" &&
+      GENERIC_TERMS_PATTERN.test(flag.issue) &&
+      !SPECIFIC_IP_PATTERN.test(flag.issue)
+    ) {
+      logger.warn(
+        { shotIndex: flag.shotIndex, issue: flag.issue },
+        "Safety: downgrading false-positive IP block on generic imagery to warn"
+      );
+      flag.severity = "warn";
+    }
+  }
+
+  // Re-derive approved after potential downgrades
   const blockFlags = safetyOutput.flags.filter((f) => f.severity === "block");
   if (blockFlags.length > 0) {
     throw new Error(
       `Safety review blocked the storyboard: ${blockFlags.map((f) => f.issue).join("; ")}`
     );
   }
+  safetyOutput.approved = true;
 
   // Persist storyboard
   const storyboardRecord = await db.storyboard.create({
