@@ -57,11 +57,21 @@ function checkFFmpeg(): ServiceStatus {
   }
 }
 
-function checkPremium(): ServiceStatus {
-  if (!config.PREMIUM_PROVIDER) {
-    return { name: "Premium Renderer", status: "not_configured" };
+async function checkPremium(): Promise<ServiceStatus> {
+  const provider = config.PREMIUM_VIDEO_PROVIDER;
+  if (!provider) {
+    return { name: "Premium Video", status: "not_configured" };
   }
-  return { name: "Premium Renderer", status: "ok", message: config.PREMIUM_PROVIDER };
+  try {
+    const { getPremiumVideoProvider } = await import("../providers/video/premium/index.js");
+    const p = getPremiumVideoProvider(provider);
+    const health = await p.checkHealth();
+    return health.healthy
+      ? { name: "Premium Video", status: "ok", message: provider }
+      : { name: "Premium Video", status: "down", message: `${provider}: ${health.message}` };
+  } catch (e) {
+    return { name: "Premium Video", status: "down", message: String(e) };
+  }
 }
 
 export async function runHealthChecks(): Promise<{
@@ -74,11 +84,11 @@ export async function runHealthChecks(): Promise<{
     checkRedis(),
     Promise.resolve(checkStudioRoot()),
     Promise.resolve(checkFFmpeg()),
-    Promise.resolve(checkPremium()),
+    checkPremium(),
   ]);
 
   const healthy = services
-    .filter((s) => s.name !== "Premium Renderer") // Premium is optional
+    .filter((s) => s.name !== "Premium Video") // Premium is optional
     .every((s) => s.status === "ok");
 
   return { healthy, services };

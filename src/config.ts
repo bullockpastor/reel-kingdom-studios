@@ -16,7 +16,7 @@ const configSchema = z.object({
 
   WAN21_STEPS: z.coerce.number().default(30),
   WAN21_CFG: z.coerce.number().default(6),
-  WAN21_SAMPLER: z.string().default("uni_pc"),
+  WAN21_SAMPLER: z.string().default("euler"),
   WAN21_DEFAULT_WIDTH: z.coerce.number().default(832),
   WAN21_DEFAULT_HEIGHT: z.coerce.number().default(480),
   WAN21_DEFAULT_FPS: z.coerce.number().default(16),
@@ -25,7 +25,29 @@ const configSchema = z.object({
   OLLAMA_URL: z.string().default("http://127.0.0.1:11434"),
   OLLAMA_MODEL: z.string().default("llama3.2"),
 
-  PREMIUM_PROVIDER: z.enum(["runway", "kling", "pika"]).optional().or(z.literal("")).transform(v => v || undefined),
+  PREMIUM_VIDEO_PROVIDER: z
+    .enum(["openai_sora", "runway_gen4", "kling_video", "google_veo"])
+    .optional()
+    .or(z.literal(""))
+    .transform((v) => v || undefined),
+
+  // OpenAI Sora
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_VIDEO_MODEL: z.string().default("sora-2"),
+
+  // Runway Gen4
+  RUNWAY_API_KEY: z.string().optional(),
+  RUNWAY_VIDEO_MODEL: z.string().default("gen4_turbo"),
+
+  // Kling Video
+  KLING_API_KEY: z.string().optional(),
+  KLING_VIDEO_MODEL: z.string().default("kling-v1"),
+
+  // Google Veo (Vertex AI)
+  GOOGLE_VEO_MODEL: z.string().default("veo-2.0-generate-001"),
+  GOOGLE_VERTEX_PROJECT: z.string().optional(),
+  GOOGLE_VERTEX_LOCATION: z.string().default("us-central1"),
+  GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
 
   FFMPEG_PATH: z.string().default("ffmpeg"),
   DEFAULT_TRANSITION_DURATION: z.coerce.number().default(0.5),

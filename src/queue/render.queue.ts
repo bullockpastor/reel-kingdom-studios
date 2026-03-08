@@ -16,6 +16,8 @@ export interface RenderJobData {
   seed?: number;
   outputDir: string;
   triggerReason?: "cinema_mode" | "qc_fail_twice" | "manual";
+  /** Per-shot provider override (openai_sora | runway_gen4 | kling_video | google_veo). */
+  premiumProvider?: string;
 }
 
 export const renderQueue = new Queue<RenderJobData>("render", {

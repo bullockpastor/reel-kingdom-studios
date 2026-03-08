@@ -2,7 +2,7 @@ import { Worker } from "bullmq";
 import { getRedisConnection } from "./connection.js";
 import type { RenderJobData } from "./render.queue.js";
 import { db } from "../db.js";
-import { getLocalRenderer, getPremiumRenderer } from "../providers/video/index.js";
+import { getLocalRenderer, getPremiumVideoProvider } from "../providers/video/index.js";
 import { runAgent, visualQCAgent } from "../agents/index.js";
 import { shotRenderDir } from "../storage/studio-root.js";
 import { config } from "../config.js";
@@ -57,9 +57,10 @@ const worker = new Worker<RenderJobData>(
           });
         }
       } else {
-        // Premium rendering
-        const premiumRenderer = getPremiumRenderer();
-        const result = await premiumRenderer.render({
+        // Premium rendering via provider-agnostic factory
+        const premiumProvider = getPremiumVideoProvider(data.premiumProvider);
+        const renderDir = shotRenderDir(data.projectId, data.shotId, "final");
+        const result = await premiumProvider.render({
           shotId: data.shotId,
           prompt: data.prompt,
           negativePrompt: data.negativePrompt,
@@ -69,12 +70,15 @@ const worker = new Worker<RenderJobData>(
           fps: data.fps,
           aspectRatio: `${data.width}:${data.height}`,
           seed: data.seed,
+          outputDir: renderDir,
+          filenamePrefix: `shot_${data.shotId}`,
           triggerReason: data.triggerReason || "manual",
         });
 
         if (!result.success) throw new Error(result.error || "Premium render failed");
 
-        filePath = result.filePath;
+        filePath = result.videoPath;
+        durationMs = result.durationMs ?? 0;
 
         // Persist audit trail
         await db.premiumAudit.create({
@@ -83,8 +87,8 @@ const worker = new Worker<RenderJobData>(
             provider: result.provider,
             premiumTriggerReason: data.triggerReason || "manual",
             requestId: result.requestId,
-            estimatedCost: result.estimatedCost,
-            responseMetadata: JSON.stringify(result.responseMetadata),
+            estimatedCost: result.costEstimate,
+            responseMetadata: JSON.stringify(result.rawResponseMeta ?? {}),
             status: "completed",
             completedAt: new Date(),
           },
@@ -114,6 +118,17 @@ const worker = new Worker<RenderJobData>(
       };
 
       const qcScore = typeof qcOutput.score === "number" ? qcOutput.score : 0.7;
+
+      // Score-floor override: the QC agent evaluates blind (no actual video).
+      // If the score is good enough, accept regardless of LLM recommendation.
+      const QC_ACCEPT_FLOOR = 0.65;
+      if (qcScore >= QC_ACCEPT_FLOOR && qcOutput.recommendation !== "accept") {
+        logger.warn(
+          { shotId: data.shotId, qcScore, originalRecommendation: qcOutput.recommendation },
+          "QC score above floor — overriding recommendation to accept"
+        );
+        qcOutput.recommendation = "accept";
+      }
 
       // Update render job as complete
       await db.renderJob.update({

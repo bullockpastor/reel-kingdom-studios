@@ -4,6 +4,26 @@ import { queueRender } from "../services/render.service.js";
 import { config } from "../config.js";
 
 export async function shotRoutes(app: FastifyInstance) {
+  // GET /shots/:id — Single shot with render history
+  app.get("/:id", async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    const shot = await db.shot.findUnique({
+      where: { id },
+      include: {
+        renderJobs: { orderBy: { createdAt: "desc" } },
+        premiumAudits: { orderBy: { createdAt: "desc" } },
+        project: true,
+      },
+    });
+
+    if (!shot) {
+      return reply.status(404).send({ error: "Shot not found" });
+    }
+
+    return shot;
+  });
+
   // POST /shots/:id/render — Render an individual shot
   app.post("/:id/render", async (request, reply) => {
     const { id } = request.params as { id: string };
@@ -14,6 +34,8 @@ export async function shotRoutes(app: FastifyInstance) {
       height?: number;
       fps?: number;
       seed?: number;
+      /** Override which premium provider handles this shot (openai_sora | runway_gen4 | kling_video | google_veo). */
+      provider?: string;
     };
 
     const shot = await db.shot.findUnique({
@@ -40,10 +62,11 @@ export async function shotRoutes(app: FastifyInstance) {
       engine = "premium";
     }
 
-    if (engine === "premium" && !config.PREMIUM_PROVIDER) {
+    if (engine === "premium" && !config.PREMIUM_VIDEO_PROVIDER && !body.provider) {
       return reply.status(400).send({
         error:
-          "Premium rendering not configured. Set PREMIUM_PROVIDER in .env",
+          "Premium rendering not configured. Set PREMIUM_VIDEO_PROVIDER in .env " +
+          "or pass a provider in the request body.",
       });
     }
 
@@ -54,6 +77,7 @@ export async function shotRoutes(app: FastifyInstance) {
         height: body.height || config.WAN21_DEFAULT_HEIGHT,
         fps: body.fps || config.WAN21_DEFAULT_FPS,
         seed: body.seed,
+        premiumProvider: body.provider,
       });
       return reply.status(202).send(result);
     } catch (err) {

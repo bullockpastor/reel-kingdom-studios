@@ -11,14 +11,14 @@ export class PremiumRendererStub implements PremiumRenderer {
   readonly provider: string;
 
   constructor() {
-    this.provider = config.PREMIUM_PROVIDER || "none";
+    this.provider = config.PREMIUM_VIDEO_PROVIDER || "none";
   }
 
   async render(
     _request: PremiumRenderRequest,
     _params?: PremiumProviderParams
   ): Promise<PremiumRenderResult> {
-    if (!config.PREMIUM_PROVIDER) {
+    if (!config.PREMIUM_VIDEO_PROVIDER) {
       return {
         success: false,
         requestId: "",
@@ -26,7 +26,7 @@ export class PremiumRendererStub implements PremiumRenderer {
         provider: "none",
         responseMetadata: {},
         error:
-          "Premium rendering not configured. Set PREMIUM_PROVIDER in .env to one of: runway, kling, pika",
+          "Premium rendering not configured. Set PREMIUM_VIDEO_PROVIDER in .env to one of: runway, kling, pika",
       };
     }
 
@@ -35,9 +35,9 @@ export class PremiumRendererStub implements PremiumRenderer {
       success: false,
       requestId: "",
       estimatedCost: 0,
-      provider: config.PREMIUM_PROVIDER,
+      provider: config.PREMIUM_VIDEO_PROVIDER,
       responseMetadata: {},
-      error: `Provider "${config.PREMIUM_PROVIDER}" is not yet implemented.`,
+      error: `Provider "${config.PREMIUM_VIDEO_PROVIDER}" is not yet implemented.`,
     };
   }
 
@@ -46,6 +46,6 @@ export class PremiumRendererStub implements PremiumRenderer {
   }
 
   async healthCheck(): Promise<boolean> {
-    return !!config.PREMIUM_PROVIDER;
+    return !!config.PREMIUM_VIDEO_PROVIDER;
   }
 }

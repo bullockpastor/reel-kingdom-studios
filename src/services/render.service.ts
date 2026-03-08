@@ -12,6 +12,8 @@ interface RenderOptions {
   fps: number;
   seed?: number;
   cinemaMode?: boolean;
+  /** Per-shot provider override. Falls back to PREMIUM_VIDEO_PROVIDER env var. */
+  premiumProvider?: string;
 }
 
 export async function queueRender(
@@ -52,6 +54,7 @@ export async function queueRender(
     seed: options.seed,
     outputDir,
     triggerReason,
+    premiumProvider: options.premiumProvider,
   });
 
   // Update job with BullMQ ID

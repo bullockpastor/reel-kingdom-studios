@@ -13,6 +13,7 @@ export function getLocalRenderer(): VideoRenderer {
   return localRenderer;
 }
 
+/** @deprecated Use getPremiumVideoProvider() from the premium/ module instead. */
 export function getPremiumRenderer(): PremiumRenderer {
   if (!premiumRenderer) {
     premiumRenderer = new PremiumRendererStub();
@@ -22,3 +23,10 @@ export function getPremiumRenderer(): PremiumRenderer {
 
 export type { VideoRenderer, RenderRequest, RenderResult } from "./video-renderer.interface.js";
 export type { PremiumRenderer, PremiumRenderRequest, PremiumRenderResult } from "./premium-renderer.interface.js";
+
+// New provider-agnostic premium layer
+export { getPremiumVideoProvider, clearProviderCache } from "./premium/index.js";
+export type {
+  IPremiumVideoProvider,
+  PremiumProvider,
+} from "./premium/index.js";
