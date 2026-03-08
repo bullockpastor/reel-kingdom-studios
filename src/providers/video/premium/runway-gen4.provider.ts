@@ -8,6 +8,23 @@ import { downloadVideoFile, sleep, msElapsed } from "./download.utils.js";
 
 const RUNWAY_BASE = "https://api.dev.runwayml.com/v1";
 const RUNWAY_VERSION = "2024-11-06";
+
+// Valid Runway text-to-video models as of 2025-Q1:
+// gen3a_turbo | gen4.5 | veo3 | veo3.1 | veo3.1_fast
+
+// Runway ratio accepts pixel-dimension strings, not traditional aspect ratios
+const RUNWAY_RATIO_MAP: Record<string, string> = {
+  "16:9": "1280:720",
+  "9:16": "720:1280",
+  "4:3":  "1280:960",
+  "1:1":  "1024:1024",
+};
+
+function toRunwayRatio(aspectRatio: string | undefined, width: number, height: number): string {
+  if (aspectRatio && RUNWAY_RATIO_MAP[aspectRatio]) return RUNWAY_RATIO_MAP[aspectRatio];
+  // If already pixel-format (e.g. "1280:720") pass through; otherwise best-effort
+  return `${width}:${height}`;
+}
 const POLL_INTERVAL_MS = 5_000;
 const MAX_WAIT_MS = 600_000;
 
@@ -60,9 +77,9 @@ export class RunwayGen4Provider implements IPremiumVideoProvider {
       headers: this.headers(),
       body: JSON.stringify({
         model: this.model,
-        prompt_text: req.prompt,
+        promptText: req.prompt,
         duration: req.durationSeconds,
-        ratio: req.aspectRatio || `${req.width}:${req.height}`,
+        ratio: toRunwayRatio(req.aspectRatio, req.width, req.height),
         seed: req.seed,
       }),
     });

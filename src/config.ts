@@ -37,7 +37,7 @@ const configSchema = z.object({
 
   // Runway Gen4
   RUNWAY_API_KEY: z.string().optional(),
-  RUNWAY_VIDEO_MODEL: z.string().default("gen4_turbo"),
+  RUNWAY_VIDEO_MODEL: z.string().default("gen4.5"),
 
   // Kling Video
   KLING_API_KEY: z.string().optional(),
