@@ -4,10 +4,12 @@ import { HealthPanel } from "@/components/health/HealthPanel";
 import { QueueOverview } from "@/components/queue/QueueOverview";
 import { ProjectCard } from "@/components/project/ProjectCard";
 import { CreateWizard } from "@/components/wizard/CreateWizard";
+import { CreateProjectLauncher } from "@/components/CreateProjectLauncher";
 import { Plus } from "lucide-react";
 
 export function Dashboard() {
   const { data: projects } = useProjects();
+  const [launcherOpen, setLauncherOpen] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
   const recent = projects?.slice(0, 5) ?? [];
 
@@ -16,11 +18,11 @@ export function Dashboard() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-text-primary">Dashboard</h1>
         <button
-          onClick={() => setWizardOpen(true)}
+          onClick={() => setLauncherOpen(true)}
           className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors"
         >
           <Plus size={16} />
-          New Project
+          Create Project
         </button>
       </div>
 
@@ -41,6 +43,13 @@ export function Dashboard() {
           </div>
         )}
       </div>
+
+      {launcherOpen && (
+        <CreateProjectLauncher
+          onClose={() => setLauncherOpen(false)}
+          onSelectCinematic={() => setWizardOpen(true)}
+        />
+      )}
 
       {wizardOpen && <CreateWizard onClose={() => setWizardOpen(false)} />}
     </div>

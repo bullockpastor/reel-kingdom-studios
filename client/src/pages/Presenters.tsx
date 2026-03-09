@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { usePresenters, useCreatePresenter, useCreatePresenterProject } from "@/api/hooks";
 import { StatusBadge } from "@/components/project/StatusBadge";
 import { timeAgo } from "@/lib/utils";
@@ -11,12 +11,17 @@ const VIDEO_TYPES = ["sermon", "devotional", "announcement", "social"];
 
 export function Presenters() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: presenters, isLoading } = usePresenters();
   const createPresenter = useCreatePresenter();
   const createProject = useCreatePresenterProject();
 
+  // Auto-open the new project panel when arriving from the Create Project launcher
+  const locationState = location.state as { openNewProject?: boolean } | null;
   const [showNewPresenter, setShowNewPresenter] = useState(false);
-  const [showNewProject, setShowNewProject] = useState(false);
+  const [showNewProject, setShowNewProject] = useState(
+    locationState?.openNewProject === true
+  );
 
   // New presenter form state
   const [presenterForm, setPresenterForm] = useState({
