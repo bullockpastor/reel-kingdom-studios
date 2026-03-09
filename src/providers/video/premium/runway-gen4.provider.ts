@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { extname } from "node:path";
 import type { IPremiumVideoProvider } from "./premium.interface.js";
 import type {
   PremiumRenderRequest,
@@ -5,14 +7,12 @@ import type {
   PremiumRenderCapabilities,
 } from "./premium.types.js";
 import { downloadVideoFile, sleep, msElapsed } from "./download.utils.js";
+import { logger } from "../../../utils/logger.js";
 
 const RUNWAY_BASE = "https://api.dev.runwayml.com/v1";
 const RUNWAY_VERSION = "2024-11-06";
 
-// Valid Runway text-to-video models as of 2025-Q1:
-// gen3a_turbo | gen4.5 | veo3 | veo3.1 | veo3.1_fast
-
-// Runway ratio accepts pixel-dimension strings, not traditional aspect ratios
+// Runway Gen4 only accepts these exact pixel-dimension strings as the ratio field.
 const RUNWAY_RATIO_MAP: Record<string, string> = {
   "16:9": "1280:720",
   "9:16": "720:1280",
@@ -20,11 +20,51 @@ const RUNWAY_RATIO_MAP: Record<string, string> = {
   "1:1":  "1024:1024",
 };
 
+/**
+ * Map an aspect ratio string or raw dimensions to the nearest Runway-accepted
+ * pixel-dimension string. Runway rejects anything not in its supported list.
+ */
 function toRunwayRatio(aspectRatio: string | undefined, width: number, height: number): string {
+  // Named aspect ratio lookup (e.g. "16:9" → "1280:720")
   if (aspectRatio && RUNWAY_RATIO_MAP[aspectRatio]) return RUNWAY_RATIO_MAP[aspectRatio];
-  // If already pixel-format (e.g. "1280:720") pass through; otherwise best-effort
-  return `${width}:${height}`;
+
+  // Snap from raw dimensions to the nearest supported ratio.
+  // Handles cases like 832x480 (passed as "832:480") which isn't in the map.
+  const r = width / height;
+  if (r >= 1.5) return "1280:720";   // 16:9 landscape
+  if (r <= 0.7) return "720:1280";   // 9:16 portrait
+  if (r >= 1.2) return "1280:960";   // 4:3
+  return "1024:1024";                // square
 }
+
+/**
+ * Runway Gen4/Gen4.5 only supports 5 or 10 second clips.
+ * Snap the requested duration to the nearest supported value.
+ */
+function snapToRunwayDuration(durationSeconds: number): 5 | 10 {
+  return durationSeconds <= 7.5 ? 5 : 10;
+}
+
+/**
+ * Read a local image file and return a base64 data URI suitable for Runway's
+ * promptImage field. Returns null if the file cannot be read.
+ */
+function imageToDataUri(filePath: string): string | null {
+  try {
+    const ext = extname(filePath).toLowerCase();
+    const mime =
+      ext === ".png"  ? "image/png"  :
+      ext === ".webp" ? "image/webp" :
+      ext === ".gif"  ? "image/gif"  :
+      "image/jpeg";
+    const buf = readFileSync(filePath);
+    return `data:${mime};base64,${buf.toString("base64")}`;
+  } catch (err) {
+    logger.warn({ filePath, err }, "Runway: could not read reference image — skipping promptImage");
+    return null;
+  }
+}
+
 const POLL_INTERVAL_MS = 5_000;
 const MAX_WAIT_MS = 600_000;
 
@@ -72,16 +112,32 @@ export class RunwayGen4Provider implements IPremiumVideoProvider {
   async render(req: PremiumRenderRequest): Promise<PremiumRenderResult> {
     const startMs = Date.now();
 
+    const duration = snapToRunwayDuration(req.durationSeconds);
+    const ratio = toRunwayRatio(req.aspectRatio, req.width, req.height);
+
+    // Build promptImage array if a reference image is available (presenter identity anchor)
+    let promptImage: Array<{ uri: string }> | undefined;
+    if (req.referenceImagePath) {
+      const dataUri = imageToDataUri(req.referenceImagePath);
+      if (dataUri) {
+        promptImage = [{ uri: dataUri }];
+        logger.info({ shotId: req.shotId }, "Runway: using reference image for identity anchoring");
+      }
+    }
+
+    const body: Record<string, unknown> = {
+      model: this.model,
+      promptText: req.prompt,
+      duration,
+      ratio,
+      seed: req.seed,
+    };
+    if (promptImage) body.promptImage = promptImage;
+
     const createResp = await fetch(`${RUNWAY_BASE}/text_to_video`, {
       method: "POST",
       headers: this.headers(),
-      body: JSON.stringify({
-        model: this.model,
-        promptText: req.prompt,
-        duration: req.durationSeconds,
-        ratio: toRunwayRatio(req.aspectRatio, req.width, req.height),
-        seed: req.seed,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!createResp.ok) {
@@ -96,6 +152,8 @@ export class RunwayGen4Provider implements IPremiumVideoProvider {
 
     const task = (await createResp.json()) as RunwayTaskResponse;
     const taskId = task.id;
+
+    logger.info({ shotId: req.shotId, taskId, duration, ratio }, "Runway task submitted — polling");
 
     const deadline = startMs + MAX_WAIT_MS;
     while (Date.now() < deadline) {
@@ -144,6 +202,8 @@ export class RunwayGen4Provider implements IPremiumVideoProvider {
           durationMs: msElapsed(startMs),
         };
       }
+
+      logger.debug({ taskId, status: pollData.status, progress: pollData.progress }, "Runway: still processing");
     }
 
     return {
@@ -157,7 +217,6 @@ export class RunwayGen4Provider implements IPremiumVideoProvider {
 
   async checkHealth(): Promise<{ healthy: boolean; message?: string }> {
     try {
-      // HEAD or GET /organization is a lightweight auth check for Runway
       const resp = await fetch(`${RUNWAY_BASE}/organization`, {
         headers: this.headers(),
       });

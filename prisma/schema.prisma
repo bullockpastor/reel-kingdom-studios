@@ -11,7 +11,8 @@ model Project {
   id                String      @id @default(cuid())
   title             String
   idea              String
-  format            String      @default("horizontal") // vertical | horizontal | square
+  projectType       String      @default("cinematic")   // "cinematic" | "presenter"
+  format            String      @default("horizontal")  // vertical | horizontal | square
   targetAspectRatio String      @default("16:9")        // 16:9 | 9:16 | 1:1
   targetWidth       Int         @default(832)
   targetHeight      Int         @default(480)
@@ -21,8 +22,9 @@ model Project {
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
 
-  shots      Shot[]
-  storyboard Storyboard?
+  shots           Shot[]
+  storyboard      Storyboard?
+  presenterScript PresenterScript?
 }
 
 model Storyboard {
@@ -46,17 +48,21 @@ model Shot {
   durationSeconds Float          @default(3.0)
   cameraMotion    String?
   mood            String?
-  reframeFocus    String         @default("center")  // center | left | right | upper | lower
-  reframePan      String         @default("none")    // none | slow_ltr | slow_rtl
-  status          String         @default("pending") // pending | queued | rendering | rendered | failed | premium_routed
-  renderPath      String?
-  renderEngine    String?
-  qcScore         Float?
-  qcFailCount     Int            @default(0)
-  comfyuiPromptId String?
-  errorMessage    String?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  reframeFocus      String         @default("center")  // center | left | right | upper | lower
+  reframePan        String         @default("none")    // none | slow_ltr | slow_rtl
+  status            String         @default("pending") // pending | queued | rendering | rendered | failed | premium_routed
+  renderPath        String?
+  renderEngine      String?
+  qcScore           Float?
+  qcFailCount       Int            @default(0)
+  comfyuiPromptId   String?
+  errorMessage      String?
+  // Presenter pipeline fields
+  scriptSegmentJson String?        // full segment JSON blob
+  segmentIndex      Int?           // explicit alignment with script segment index
+  templateId        String?        // per-segment set/background template
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
   renderJobs    RenderJob[]
   premiumAudits PremiumAudit[]
@@ -93,4 +99,33 @@ model PremiumAudit {
   status               String    @default("requested") // requested | processing | completed | failed
   createdAt            DateTime  @default(now())
   completedAt          DateTime?
+}
+
+model Presenter {
+  id                 String            @id @default(cuid())
+  name               String
+  description        String            // woven into visual prompts
+  referenceImagePath String?           // local path served via /assets (NOT a remote URL)
+  voiceId            String?           // TTS Phase 2
+  defaultProvider    String            @default("runway_gen4")
+  defaultTemplateId  String?
+  presenterScripts   PresenterScript[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+}
+
+model PresenterScript {
+  id              String    @id @default(cuid())
+  projectId       String    @unique
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  presenterId     String
+  presenter       Presenter @relation(fields: [presenterId], references: [id])
+  rawScript       String
+  directedScript  String    // JSON from Script Director Agent
+  performanceSpec String    // JSON from Performance Director Agent
+  deliveryMode    String    @default("sermon")  // sermon | devotional | announcement | social
+  templateId      String?
+  status          String    @default("drafted") // drafted | directed | queued | rendering | complete | failed
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }

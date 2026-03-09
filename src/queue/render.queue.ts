@@ -18,6 +18,8 @@ export interface RenderJobData {
   triggerReason?: "cinema_mode" | "qc_fail_twice" | "manual";
   /** Per-shot provider override (openai_sora | runway_gen4 | kling_video | google_veo). */
   premiumProvider?: string;
+  /** Absolute local path to a presenter reference image for identity anchoring. */
+  referenceImagePath?: string;
 }
 
 export const renderQueue = new Queue<RenderJobData>("render", {

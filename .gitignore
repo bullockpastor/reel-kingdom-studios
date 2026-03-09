@@ -26,3 +26,7 @@ Thumbs.db
 
 # Redis
 dump.rdb
+
+# Client build output
+client/dist/
+client/node_modules/

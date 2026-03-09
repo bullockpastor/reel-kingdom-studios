@@ -67,3 +67,54 @@ export function useAssemble() {
     onSuccess: (_data, id) => qc.invalidateQueries({ queryKey: ["project", id] }),
   });
 }
+
+// ─── Presenter hooks ──────────────────────────────────────────────────────
+
+export function usePresenters() {
+  return useQuery({ queryKey: ["presenters"], queryFn: api.listPresenters });
+}
+
+export function useCreatePresenter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.createPresenter,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["presenters"] }),
+  });
+}
+
+export function usePresenterProject(id: string) {
+  return useQuery({
+    queryKey: ["presenterProject", id],
+    queryFn: () => api.getPresenterProject(id),
+    refetchInterval: 4000,
+  });
+}
+
+export function useCreatePresenterProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.createPresenterProject,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["presenters"] }),
+  });
+}
+
+export function useDirectPresenterProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data?: { rawScript?: string } }) =>
+      api.directPresenterProject(id, data),
+    onSuccess: (_data, { id }) => qc.invalidateQueries({ queryKey: ["presenterProject", id] }),
+  });
+}
+
+export function useProducePresenterProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, provider }: { id: string; provider?: string }) =>
+      api.producePresenterProject(id, provider),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: ["presenterProject", id] });
+      qc.invalidateQueries({ queryKey: ["queue"] });
+    },
+  });
+}

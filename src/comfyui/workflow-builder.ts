@@ -21,7 +21,9 @@ export function buildWan21Workflow(params: WorkflowParams): Record<string, unkno
   const templatePath = join(__dirname, "workflows", "wan21-t2v.json");
   const template = readFileSync(templatePath, "utf-8");
 
-  const frameCount = Math.round(params.durationSeconds * params.fps);
+  // WAN2.1 latent requires (length - 1) % 4 == 0  (e.g. 1, 5, 9, 13, 17, 21, 25, 29, 33…)
+  const rawFrames = Math.round(params.durationSeconds * params.fps);
+  const frameCount = Math.max(1, rawFrames - ((rawFrames - 1) % 4));
   const seed = params.seed ?? Math.floor(Math.random() * 2147483647);
   const steps = params.steps ?? config.WAN21_STEPS;
 

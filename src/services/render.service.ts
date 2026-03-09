@@ -14,6 +14,8 @@ interface RenderOptions {
   cinemaMode?: boolean;
   /** Per-shot provider override. Falls back to PREMIUM_VIDEO_PROVIDER env var. */
   premiumProvider?: string;
+  /** Absolute local path to a reference image for identity anchoring (presenter pipeline). */
+  referenceImagePath?: string;
 }
 
 export async function queueRender(
@@ -55,6 +57,7 @@ export async function queueRender(
     outputDir,
     triggerReason,
     premiumProvider: options.premiumProvider,
+    referenceImagePath: options.referenceImagePath,
   });
 
   // Update job with BullMQ ID

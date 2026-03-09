@@ -2,6 +2,7 @@ export interface Project {
   id: string;
   title: string;
   idea: string;
+  projectType: string;
   format: "horizontal" | "vertical" | "square";
   targetAspectRatio: string;
   targetWidth: number;
@@ -14,6 +15,7 @@ export interface Project {
   updatedAt: string;
   shots?: Shot[];
   storyboard?: Storyboard | null;
+  presenterScript?: PresenterScript | null;
   _count?: { shots: number };
 }
 
@@ -35,6 +37,9 @@ export interface Shot {
   qcScore: number | null;
   qcFailCount: number;
   errorMessage: string | null;
+  scriptSegmentJson: string | null;
+  segmentIndex: number | null;
+  templateId: string | null;
   createdAt: string;
   updatedAt: string;
   renderJobs?: RenderJob[];
@@ -63,6 +68,33 @@ export interface RenderJob {
   durationMs: number | null;
   createdAt: string;
   shot?: { shotIndex: number; projectId: string; prompt: string };
+}
+
+export interface Presenter {
+  id: string;
+  name: string;
+  description: string;
+  referenceImageUrl: string | null;
+  voiceId: string | null;
+  defaultProvider: string;
+  defaultTemplateId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PresenterScript {
+  id: string;
+  projectId: string;
+  presenterId: string;
+  rawScript: string;
+  directedScript: string;
+  performanceSpec: string;
+  deliveryMode: string;
+  templateId: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  presenter?: Presenter;
 }
 
 export interface HealthResponse {

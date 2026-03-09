@@ -1,4 +1,4 @@
-import type { Project, Shot, HealthResponse, QueueStatus } from "./types";
+import type { Project, Shot, HealthResponse, QueueStatus, Presenter, PresenterScript } from "./types";
 
 const BASE = "";
 
@@ -53,4 +53,39 @@ export const api = {
 
   // Asset URL helper
   assetUrl: (relativePath: string) => `/assets/${relativePath}`,
+
+  // Presenter profiles
+  listPresenters: () => request<Presenter[]>("/presenter/profiles"),
+  createPresenter: (data: {
+    name: string;
+    description: string;
+    voiceId?: string;
+    defaultProvider?: string;
+    defaultTemplateId?: string;
+  }) => request<Presenter>("/presenter/profiles", { method: "POST", body: JSON.stringify(data) }),
+  getPresenter: (id: string) => request<Presenter>(`/presenter/profiles/${id}`),
+
+  // Presenter projects
+  createPresenterProject: (data: {
+    rawScript: string;
+    presenterId: string;
+    title?: string;
+    videoType?: string;
+    targetDurationSeconds?: number;
+  }) =>
+    request<{ project: Project; presenterScript: PresenterScript; shots: Shot[]; agentResults: { agentName: string; durationMs: number }[] }>(
+      "/presenter/projects",
+      { method: "POST", body: JSON.stringify(data) }
+    ),
+  getPresenterProject: (id: string) => request<Project>(`/presenter/projects/${id}`),
+  directPresenterProject: (id: string, data?: { rawScript?: string }) =>
+    request<{ presenterScript: PresenterScript; shots: Shot[]; agentResults: unknown[] }>(
+      `/presenter/projects/${id}/direct`,
+      { method: "POST", body: JSON.stringify(data ?? {}) }
+    ),
+  producePresenterProject: (id: string, provider?: string) =>
+    request<{ message: string; results: unknown[] }>(
+      `/presenter/projects/${id}/produce`,
+      { method: "POST", body: JSON.stringify({ provider }) }
+    ),
 };

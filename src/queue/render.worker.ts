@@ -73,6 +73,7 @@ const worker = new Worker<RenderJobData>(
           outputDir: renderDir,
           filenamePrefix: `shot_${data.shotId}`,
           triggerReason: data.triggerReason || "manual",
+          referenceImagePath: data.referenceImagePath,
         });
 
         if (!result.success) throw new Error(result.error || "Premium render failed");

@@ -9,3 +9,7 @@ export {
   visualQCAgent,
   editorAssemblerAgent,
 } from "./definitions.js";
+export {
+  scriptDirectorAgent,
+  performanceDirectorAgent,
+} from "./presenter-definitions.js";

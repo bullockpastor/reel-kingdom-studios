@@ -338,13 +338,13 @@ SCORING:
 - 0.7-0.9: Good — passes QC
 - 0.9-1.0: Excellent
 
-RECOMMENDATION:
-- "accept": score >= 0.5 and no critical issues
-- "retry_local": score < 0.5, first or second attempt
-- "retry_premium": score < 0.5 and this is the second+ local failure
-- "manual_review": unusual edge case or conflicting signals
+RECOMMENDATION — score takes strict precedence:
+- "accept": score >= 0.65, OR score >= 0.5 with no critical issues. DEFAULT for any render that completed without errors.
+- "retry_local": score < 0.5 AND a specific concrete technical failure is identified (not speculative prompt risk)
+- "retry_premium": score < 0.4 AND this is the second+ local failure
+- "manual_review": render errored out or genuinely anomalous result
 
-Be conservative — it's better to retry a mediocre render than to let a bad shot into the final video.`,
+Do NOT recommend retry based on prompt content risk alone (human subjects, camera motion, etc.) — those are speculative. Only retry if the metadata gives a concrete reason to believe the render failed.`,
 };
 
 // ─────────────────────────────────────────────

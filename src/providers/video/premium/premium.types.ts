@@ -13,6 +13,8 @@ export interface PremiumRenderRequest {
   outputDir: string;
   filenamePrefix: string;
   triggerReason?: "cinema_mode" | "qc_fail_twice" | "manual";
+  /** Absolute local path to a reference image for identity anchoring (presenter pipeline). */
+  referenceImagePath?: string;
 }
 
 export interface PremiumRenderResult {

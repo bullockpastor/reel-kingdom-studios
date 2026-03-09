@@ -9,7 +9,7 @@ const configSchema = z.object({
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
 
   VIDEO_DB_URL: z.string(),
-  STUDIO_ROOT: z.string().default("/Volumes/T9/StudioRoot"),
+  STUDIO_ROOT: z.string().default("/Volumes/T9/ReelKingdomStudios"),
   REDIS_URL: z.string().default("redis://localhost:6381"),
 
   COMFYUI_URL: z.string().default("http://127.0.0.1:8188"),
