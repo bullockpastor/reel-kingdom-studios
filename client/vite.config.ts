@@ -23,6 +23,7 @@ export default defineConfig({
       "/health": "http://localhost:8010",
       "/assets": "http://localhost:8010",
       "/queue": "http://localhost:8010",
+      "/presenter": "http://localhost:8010",
     },
   },
 });
