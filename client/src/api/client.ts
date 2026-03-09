@@ -1,4 +1,4 @@
-import type { Project, Shot, HealthResponse, QueueStatus, Presenter, PresenterScript } from "./types";
+import type { Project, Shot, HealthResponse, QueueStatus, Presenter, PresenterScript, Engine, ComparisonResult } from "./types";
 
 const BASE = "";
 
@@ -89,4 +89,15 @@ export const api = {
       `/presenter/projects/${id}/produce`,
       { method: "POST", body: JSON.stringify({ provider }) }
     ),
+
+  // Engines
+  listEngines: () => request<Engine[]>("/engines"),
+  setEngineDefault: (data: { mode: "presenter" | "premium_fallback"; provider: string }) =>
+    request<{ ok: boolean; mode: string; provider: string }>("/engines/default", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  compareEngines: (data: { prompt: string; engines: string[]; durationSeconds?: number }) =>
+    request<ComparisonResult>("/engines/compare", { method: "POST", body: JSON.stringify(data) }),
+  getComparison: (id: string) => request<ComparisonResult>(`/engines/compare/${id}`),
 };

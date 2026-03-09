@@ -118,3 +118,39 @@ export function useProducePresenterProject() {
     },
   });
 }
+
+// ─── Engine hooks ─────────────────────────────────────────────────────────────
+
+export function useEngines() {
+  return useQuery({ queryKey: ["engines"], queryFn: api.listEngines, refetchInterval: 15000 });
+}
+
+export function useSetEngineDefault() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.setEngineDefault,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["engines"] }),
+  });
+}
+
+export function useCompareEngines() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.compareEngines,
+    onSuccess: (data) => qc.invalidateQueries({ queryKey: ["comparison", data.comparisonId] }),
+  });
+}
+
+export function useComparison(id: string | null) {
+  return useQuery({
+    queryKey: ["comparison", id],
+    queryFn: () => api.getComparison(id!),
+    enabled: !!id,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data) return 3000;
+      const allDone = data.shots.every((s) => s.status === "rendered" || s.status === "failed");
+      return allDone ? false : 3000;
+    },
+  });
+}

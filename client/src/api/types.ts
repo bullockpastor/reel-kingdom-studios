@@ -98,6 +98,50 @@ export interface PresenterScript {
   presenter?: Presenter;
 }
 
+export interface EngineTemplate {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface Engine {
+  key: string;
+  label: string;
+  category: "local" | "premium" | "experimental";
+  status: "configured" | "not_configured" | "local" | "unavailable";
+  description: string;
+  bestFor: string[];
+  strengths: string[];
+  weaknesses: string[];
+  supportsReferenceImage: boolean;
+  supportsPresenterMode: boolean;
+  supportsCinematicMode: boolean;
+  supportedAspectRatios: string[];
+  maxDurationSeconds: number;
+  templates: EngineTemplate[];
+  defaultRole: string[];
+}
+
+export interface StudioSettings {
+  presenterDefaultProvider?: string;
+  premiumFallbackProvider?: string;
+}
+
+export interface CompareShot {
+  engine: string;
+  shotId: string;
+  shotIndex: number;
+  status: string;
+  renderUrl: string | null;
+  errorMessage: string | null;
+}
+
+export interface ComparisonResult {
+  comparisonId: string;
+  status: string;
+  shots: CompareShot[];
+}
+
 export interface HealthResponse {
   studio: string;
   tagline: string;

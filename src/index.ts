@@ -11,6 +11,7 @@ import { shotRoutes } from "./routes/shots.js";
 import { assetRoutes } from "./routes/assets.js";
 import { queueRoutes } from "./routes/queue.js";
 import { presenterRoutes } from "./routes/presenter.js";
+import { engineRoutes } from "./routes/engines.js";
 import "./queue/render.worker.js";
 import "./queue/assembly.worker.js";
 
@@ -54,6 +55,7 @@ app.register(shotRoutes, { prefix: "/shots" });
 app.register(assetRoutes, { prefix: "/assets" });
 app.register(queueRoutes, { prefix: "/queue" });
 app.register(presenterRoutes, { prefix: "/presenter" });
+app.register(engineRoutes,   { prefix: "/engines" });
 
 // Global error handler
 app.setErrorHandler((error: Error, _request, reply) => {
