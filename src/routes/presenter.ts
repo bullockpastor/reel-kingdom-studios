@@ -127,6 +127,7 @@ export async function presenterRoutes(app: FastifyInstance) {
       title?: string;
       videoType?: string;
       targetDurationSeconds?: number;
+      provider?: string;
     };
 
     if (!body.rawScript?.trim()) {
@@ -165,6 +166,7 @@ export async function presenterRoutes(app: FastifyInstance) {
         {
           videoType: body.videoType,
           targetDurationSeconds: body.targetDurationSeconds,
+          selectedProvider: body.provider?.trim() || undefined,
         }
       );
 

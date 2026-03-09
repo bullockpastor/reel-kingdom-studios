@@ -39,6 +39,7 @@ export function Presenters() {
     title: "",
     videoType: "sermon",
     targetDurationSeconds: "",
+    provider: "runway_gen4",
   });
 
   const [projectError, setProjectError] = useState<string | null>(null);
@@ -72,6 +73,7 @@ export function Presenters() {
         targetDurationSeconds: projectForm.targetDurationSeconds
           ? Number(projectForm.targetDurationSeconds)
           : undefined,
+        provider: projectForm.provider,
       });
       navigate(`/presenter/projects/${result.project.id}`);
     } catch (err) {
@@ -198,13 +200,20 @@ export function Presenters() {
             </div>
           )}
           <form onSubmit={handleCreateProject} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-xs font-medium text-text-muted mb-1">Presenter</label>
                 <select
                   required
                   value={projectForm.presenterId}
-                  onChange={(e) => setProjectForm((f) => ({ ...f, presenterId: e.target.value }))}
+                  onChange={(e) => {
+                    const selected = presenters?.find((p) => p.id === e.target.value);
+                    setProjectForm((f) => ({
+                      ...f,
+                      presenterId: e.target.value,
+                      provider: selected?.defaultProvider ?? f.provider,
+                    }));
+                  }}
                   className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent"
                 >
                   <option value="">Select presenter…</option>
@@ -234,6 +243,16 @@ export function Presenters() {
                   onChange={(e) => setProjectForm((f) => ({ ...f, targetDurationSeconds: e.target.value }))}
                   className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent"
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-muted mb-1">Premium Provider</label>
+                <select
+                  value={projectForm.provider}
+                  onChange={(e) => setProjectForm((f) => ({ ...f, provider: e.target.value }))}
+                  className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent"
+                >
+                  {PROVIDERS.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
               </div>
             </div>
             <div>
@@ -296,7 +315,7 @@ export function Presenters() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {presenters.map((p) => (
               <PresenterCard key={p.id} presenter={p} onNewProject={() => {
-                setProjectForm((f) => ({ ...f, presenterId: p.id }));
+                setProjectForm((f) => ({ ...f, presenterId: p.id, provider: p.defaultProvider }));
                 setShowNewProject(true);
                 setShowNewPresenter(false);
               }} />

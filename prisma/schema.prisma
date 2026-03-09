@@ -123,9 +123,10 @@ model PresenterScript {
   rawScript       String
   directedScript  String    // JSON from Script Director Agent
   performanceSpec String    // JSON from Performance Director Agent
-  deliveryMode    String    @default("sermon")  // sermon | devotional | announcement | social
-  templateId      String?
-  status          String    @default("drafted") // drafted | directed | queued | rendering | complete | failed
+  deliveryMode      String    @default("sermon")  // sermon | devotional | announcement | social
+  templateId        String?
+  selectedProvider  String?   // project-level provider choice; overrides presenter.defaultProvider
+  status            String    @default("drafted") // drafted | directed | queued | rendering | complete | failed
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 }

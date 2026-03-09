@@ -66,6 +66,7 @@ interface GeneratePipelineOptions {
   videoType?: string;
   targetDurationSeconds?: number;
   templatePreference?: string;
+  selectedProvider?: string;
 }
 
 interface GeneratePipelineResult {
@@ -82,7 +83,7 @@ export async function generatePresenterPipeline(
   presenter: Presenter,
   options: GeneratePipelineOptions = {}
 ): Promise<GeneratePipelineResult> {
-  const { videoType = "sermon", targetDurationSeconds, templatePreference } = options;
+  const { videoType = "sermon", targetDurationSeconds, templatePreference, selectedProvider } = options;
   const agentResults: AgentRunResult[] = [];
 
   // ── Agent 1: Script Director ──
@@ -175,6 +176,7 @@ export async function generatePresenterPipeline(
       performanceSpec: JSON.stringify(performanceOutput),
       deliveryMode: videoType,
       templateId: templatePreference ?? presenter.defaultTemplateId ?? null,
+      selectedProvider: selectedProvider ?? null,
       status: "directed",
     },
   });
@@ -204,9 +206,14 @@ export async function queuePresenterRenders(
   presenterScript: PresenterScript & { presenter: Presenter },
   providerOverride?: string
 ) {
-  // Resolve provider via fallback chain
+  // Resolve provider via fallback chain:
+  // 1. explicit override from /produce body
+  // 2. project-level selectedProvider stored on PresenterScript
+  // 3. presenter.defaultProvider
+  // 4. global default
   const resolvedProvider =
     providerOverride ??
+    presenterScript.selectedProvider ??
     presenterScript.presenter.defaultProvider ??
     "runway_gen4";
 

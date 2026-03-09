@@ -48,7 +48,6 @@ export function PresenterWorkspace() {
   const assemble = useAssemble();
 
   const [tab, setTab] = useState<Tab>("overview");
-  const [selectedProvider, setSelectedProvider] = useState("runway_gen4");
   const [showProviderPicker, setShowProviderPicker] = useState(false);
   const [expandedVisuals, setExpandedVisuals] = useState<Set<number>>(new Set());
 
@@ -62,6 +61,9 @@ export function PresenterWorkspace() {
 
   const ps = project.presenterScript;
   const shots = project.shots ?? [];
+  const [selectedProvider, setSelectedProvider] = useState(
+    ps?.selectedProvider ?? ps?.presenter?.defaultProvider ?? "runway_gen4"
+  );
   const allRendered = shots.length > 0 && shots.every((s) => s.status === "rendered");
   const anyRendering = shots.some((s) => s.status === "rendering" || s.status === "queued");
 
@@ -243,7 +245,16 @@ export function PresenterWorkspace() {
                 <div>
                   <p className="text-sm font-semibold text-text-primary">{ps.presenter.name}</p>
                   <div className="flex gap-2 mt-1">
-                    <StatusBadge status={ps.presenter.defaultProvider} className="text-[10px]" />
+                    {ps.selectedProvider && ps.selectedProvider !== ps.presenter.defaultProvider ? (
+                      <>
+                        <StatusBadge status={ps.selectedProvider} className="text-[10px]" />
+                        <span className="text-[10px] text-text-muted">(project)</span>
+                        <StatusBadge status={ps.presenter.defaultProvider} className="text-[10px] opacity-50" />
+                        <span className="text-[10px] text-text-muted opacity-50">(default)</span>
+                      </>
+                    ) : (
+                      <StatusBadge status={ps.selectedProvider ?? ps.presenter.defaultProvider} className="text-[10px]" />
+                    )}
                     {ps.presenter.defaultTemplateId && (
                       <span className="text-[10px] text-text-muted font-mono">{ps.presenter.defaultTemplateId}</span>
                     )}

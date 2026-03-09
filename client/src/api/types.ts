@@ -91,6 +91,7 @@ export interface PresenterScript {
   performanceSpec: string;
   deliveryMode: string;
   templateId: string | null;
+  selectedProvider: string | null;
   status: string;
   createdAt: string;
   updatedAt: string;

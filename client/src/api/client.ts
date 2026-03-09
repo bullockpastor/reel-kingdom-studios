@@ -72,6 +72,7 @@ export const api = {
     title?: string;
     videoType?: string;
     targetDurationSeconds?: number;
+    provider?: string;
   }) =>
     request<{ project: Project; presenterScript: PresenterScript; shots: Shot[]; agentResults: { agentName: string; durationMs: number }[] }>(
       "/presenter/projects",
