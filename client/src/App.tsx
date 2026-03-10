@@ -8,6 +8,7 @@ import { Presenters } from "@/pages/Presenters";
 import { PresenterWorkspace } from "@/pages/PresenterWorkspace";
 import { Engines } from "@/pages/Engines";
 import { EngineCompare } from "@/pages/EngineCompare";
+import { ModelRouter } from "@/pages/ModelRouter";
 
 export function App() {
   return (
@@ -21,6 +22,7 @@ export function App() {
         <Route path="/presenter/projects/:id" element={<PresenterWorkspace />} />
         <Route path="/engines" element={<Engines />} />
         <Route path="/engines/compare" element={<EngineCompare />} />
+        <Route path="/model-router" element={<ModelRouter />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Shell>

@@ -30,6 +30,8 @@ export interface Shot {
   mood: string | null;
   reframeFocus: string;
   reframePan: string;
+  trimStart: number;
+  trimEnd: number;
   status: "pending" | "queued" | "rendering" | "rendered" | "failed" | "premium_routed";
   renderPath: string | null;
   renderUrl: string | null;
@@ -125,6 +127,27 @@ export interface Engine {
 export interface StudioSettings {
   presenterDefaultProvider?: string;
   premiumFallbackProvider?: string;
+}
+
+export interface AgentRoute {
+  provider: "ollama" | "claude" | "gemini";
+  model?: string;
+}
+
+export interface RouteTableEntry {
+  agentName: string;
+  defaultRoute: AgentRoute;
+  override: AgentRoute | null;
+  effectiveRoute: AgentRoute;
+  reason: "default" | "override" | "fallback";
+  fallbackUsed: boolean;
+  providerAvailable: boolean;
+}
+
+export interface ResolvedRoute extends AgentRoute {
+  agentName: string;
+  reason: "default" | "override" | "fallback";
+  fallbackUsed: boolean;
 }
 
 export interface CompareShot {

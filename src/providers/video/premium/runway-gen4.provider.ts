@@ -7,6 +7,8 @@ import type {
   PremiumRenderCapabilities,
 } from "./premium.types.js";
 import { downloadVideoFile, sleep, msElapsed } from "./download.utils.js";
+import { fetchWithRetry } from "../../../utils/retry.js";
+import { config } from "../../../config.js";
 import { logger } from "../../../utils/logger.js";
 
 const RUNWAY_BASE = "https://api.dev.runwayml.com/v1";
@@ -66,7 +68,6 @@ function imageToDataUri(filePath: string): string | null {
 }
 
 const POLL_INTERVAL_MS = 5_000;
-const MAX_WAIT_MS = 600_000;
 
 type RunwayStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELED";
 
@@ -134,7 +135,7 @@ export class RunwayGen4Provider implements IPremiumVideoProvider {
     };
     if (promptImage) body.promptImage = promptImage;
 
-    const createResp = await fetch(`${RUNWAY_BASE}/text_to_video`, {
+    const createResp = await fetchWithRetry(`${RUNWAY_BASE}/text_to_video`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify(body),
@@ -155,11 +156,12 @@ export class RunwayGen4Provider implements IPremiumVideoProvider {
 
     logger.info({ shotId: req.shotId, taskId, duration, ratio }, "Runway task submitted — polling");
 
-    const deadline = startMs + MAX_WAIT_MS;
+    const maxWaitMs = config.PREMIUM_POLL_TIMEOUT_MS;
+    const deadline = startMs + maxWaitMs;
     while (Date.now() < deadline) {
       await sleep(POLL_INTERVAL_MS);
 
-      const pollResp = await fetch(`${RUNWAY_BASE}/tasks/${taskId}`, {
+      const pollResp = await fetchWithRetry(`${RUNWAY_BASE}/tasks/${taskId}`, {
         headers: this.headers(),
       });
 
@@ -210,7 +212,7 @@ export class RunwayGen4Provider implements IPremiumVideoProvider {
       success: false,
       provider: "runway_gen4",
       requestId: taskId,
-      error: `Runway task timed out after ${MAX_WAIT_MS / 1000}s`,
+      error: `Runway task timed out after ${config.PREMIUM_POLL_TIMEOUT_MS / 1000}s`,
       durationMs: msElapsed(startMs),
     };
   }

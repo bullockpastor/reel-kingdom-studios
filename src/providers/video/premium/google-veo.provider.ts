@@ -8,9 +8,10 @@ import type {
   PremiumRenderCapabilities,
 } from "./premium.types.js";
 import { sleep, msElapsed } from "./download.utils.js";
+import { fetchWithRetry } from "../../../utils/retry.js";
+import { config } from "../../../config.js";
 
 const POLL_INTERVAL_MS = 10_000;
-const MAX_WAIT_MS = 600_000;
 
 interface ServiceAccountKey {
   client_email: string;
@@ -150,7 +151,7 @@ export class GoogleVeoProvider implements IPremiumVideoProvider {
       `${this.model}:predictLongRunning`,
     ].join("/");
 
-    const createResp = await fetch(endpoint, {
+    const createResp = await fetchWithRetry(endpoint, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -184,13 +185,13 @@ export class GoogleVeoProvider implements IPremiumVideoProvider {
     const operationName = lro.name;
     const pollUrl = `${this.vertexBase()}/${operationName}`;
 
-    const deadline = startMs + MAX_WAIT_MS;
+    const deadline = startMs + config.PREMIUM_POLL_TIMEOUT_MS;
     while (Date.now() < deadline) {
       await sleep(POLL_INTERVAL_MS);
 
       token = await this.getAccessToken(); // refresh if needed
 
-      const pollResp = await fetch(pollUrl, {
+      const pollResp = await fetchWithRetry(pollUrl, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -277,7 +278,7 @@ export class GoogleVeoProvider implements IPremiumVideoProvider {
       success: false,
       provider: "google_veo",
       requestId: operationName,
-      error: `Veo operation timed out after ${MAX_WAIT_MS / 1000}s`,
+      error: `Veo operation timed out after ${config.PREMIUM_POLL_TIMEOUT_MS / 1000}s`,
       durationMs: msElapsed(startMs),
     };
   }

@@ -21,6 +21,10 @@ export function useQueueStatus() {
   return useQuery({ queryKey: ["queue"], queryFn: api.queueStatus, refetchInterval: 3000 });
 }
 
+export function useCostSummary() {
+  return useQuery({ queryKey: ["costs"], queryFn: api.getCostSummary, refetchInterval: 30000 });
+}
+
 export function useCreateProject() {
   const qc = useQueryClient();
   return useMutation({
@@ -52,7 +56,11 @@ export function useRenderShot() {
 export function useRenderAll() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.renderAll(id),
+    mutationFn: (arg: string | { id: string; engine?: "local" | "premium" }) => {
+      const id = typeof arg === "string" ? arg : arg.id;
+      const engine = typeof arg === "string" ? undefined : arg.engine;
+      return api.renderAll(id, engine);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["project"] });
       qc.invalidateQueries({ queryKey: ["queue"] });
@@ -63,8 +71,43 @@ export function useRenderAll() {
 export function useAssemble() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.assemble(id),
-    onSuccess: (_data, id) => qc.invalidateQueries({ queryKey: ["project", id] }),
+    mutationFn: (arg: string | { id: string; backgroundMusicFile?: string }) => {
+      const id = typeof arg === "string" ? arg : arg.id;
+      const opts = typeof arg === "string" ? undefined : { backgroundMusicFile: arg.backgroundMusicFile };
+      return api.assemble(id, opts);
+    },
+    onSuccess: (_data, arg) => {
+      const id = typeof arg === "string" ? arg : arg.id;
+      qc.invalidateQueries({ queryKey: ["project", id] });
+    },
+  });
+}
+
+export function useAudioLibrary() {
+  return useQuery({ queryKey: ["audioLibrary"], queryFn: api.listAudioLibrary });
+}
+
+export function useReorderShots() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectId, shotIds }: { projectId: string; shotIds: string[] }) =>
+      api.reorderShots(projectId, shotIds),
+    onSuccess: (_data, { projectId }) => {
+      qc.invalidateQueries({ queryKey: ["project", projectId] });
+      qc.invalidateQueries({ queryKey: ["presenterProject", projectId] });
+    },
+  });
+}
+
+export function useUpdateShot() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ shotId, data }: { shotId: string; data: { trimStart?: number; trimEnd?: number } }) =>
+      api.updateShot(shotId, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["project"] });
+      qc.invalidateQueries({ queryKey: ["presenterProject"] });
+    },
   });
 }
 

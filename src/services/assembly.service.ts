@@ -11,7 +11,8 @@ export async function queueAssembly(
   shots: Shot[],
   storyboard: Storyboard | null,
   transitionDuration?: number,
-  outputFormat?: "mp4" | "webm"
+  outputFormat?: "mp4" | "webm",
+  audioPaths?: { primaryAudioPath?: string; backgroundMusicPath?: string }
 ) {
   const format = outputFormat || (config.DEFAULT_OUTPUT_FORMAT as "mp4" | "webm");
   const outputDir = projectOutputDir(project.id);
@@ -56,16 +57,17 @@ export async function queueAssembly(
     totalDurationSeconds: number;
   };
 
-  // Map edit plan to assembly queue data
+  // Map edit plan to assembly queue data (use shot trim override when set)
   const assemblyShots = shots.map((shot) => {
     const plan = editPlan.editPlan.find((p) => p.shotIndex === shot.shotIndex);
+    const hasTrimOverride = (shot.trimStart ?? 0) > 0 || (shot.trimEnd ?? 0) > 0;
     return {
       shotId: shot.id,
       shotIndex: shot.shotIndex,
       filePath: shot.renderPath!,
       durationSeconds: shot.durationSeconds,
-      trimStart: plan?.trimStart ?? 0,
-      trimEnd: plan?.trimEnd ?? 0,
+      trimStart: hasTrimOverride ? (shot.trimStart ?? 0) : (plan?.trimStart ?? 0),
+      trimEnd: hasTrimOverride ? (shot.trimEnd ?? 0) : (plan?.trimEnd ?? 0),
       transitionType: plan?.transitionType ?? "crossfade",
       transitionDuration: plan?.transitionDuration ?? (transitionDuration || config.DEFAULT_TRANSITION_DURATION),
       speedFactor: plan?.speedFactor ?? 1.0,
@@ -84,6 +86,8 @@ export async function queueAssembly(
     nativeWidth: config.WAN21_DEFAULT_WIDTH,
     nativeHeight: config.WAN21_DEFAULT_HEIGHT,
     shots: assemblyShots,
+    primaryAudioPath: audioPaths?.primaryAudioPath,
+    backgroundMusicPath: audioPaths?.backgroundMusicPath,
   });
 
   logger.info({ projectId: project.id, jobId: job.id }, "Assembly job queued");

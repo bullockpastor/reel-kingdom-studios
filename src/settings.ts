@@ -7,11 +7,18 @@ import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
 import { config } from "./config.js";
 
+export interface AgentRouteOverride {
+  provider: "ollama" | "claude" | "gemini";
+  model?: string;
+}
+
 export interface StudioSettings {
   /** Default provider for new presenter projects */
   presenterDefaultProvider?: string;
   /** Fallback premium provider when the primary fails */
   premiumFallbackProvider?: string;
+  /** Per-agent LLM provider overrides */
+  agentRoutes?: Record<string, AgentRouteOverride>;
 }
 
 const SETTINGS_PATH = join(config.STUDIO_ROOT, "settings.json");

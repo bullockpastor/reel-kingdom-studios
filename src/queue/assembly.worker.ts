@@ -18,6 +18,8 @@ const worker = new Worker<AssemblyJobData>(
 
     try {
       await assembleVideo({
+        primaryAudioPath: data.primaryAudioPath,
+        backgroundMusicPath: data.backgroundMusicPath,
         shots: data.shots.map((s) => ({
           filePath: s.filePath,
           durationSeconds: s.durationSeconds,

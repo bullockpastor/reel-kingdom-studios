@@ -32,6 +32,11 @@ export interface AssemblyOptions {
   targetHeight: number;
   nativeWidth: number;    // Wan2.1 render width (e.g. 832)
   nativeHeight: number;   // Wan2.1 render height (e.g. 480)
+  /** Optional primary audio (e.g. TTS) — mixed with video */
+  primaryAudioPath?: string;
+  /** Optional background music — mixed at reduced volume */
+  backgroundMusicPath?: string;
+  backgroundMusicVolume?: number;  // 0-1, default 0.2
 }
 
 /**
@@ -121,11 +126,25 @@ function buildReframeFilter(
 }
 
 export async function assembleVideo(options: AssemblyOptions): Promise<void> {
-  const { shots, outputPath, targetWidth, targetHeight, nativeWidth, nativeHeight } = options;
+  const {
+    shots,
+    outputPath,
+    targetWidth,
+    targetHeight,
+    nativeWidth,
+    nativeHeight,
+    primaryAudioPath,
+    backgroundMusicPath,
+    backgroundMusicVolume = 0.2,
+  } = options;
 
   if (shots.length === 0) throw new Error("No shots to assemble");
 
+  const needsAudioMix = !!(primaryAudioPath || backgroundMusicPath);
+
   const needsReframe = Math.abs(targetWidth / targetHeight - nativeWidth / nativeHeight) >= 0.05;
+
+  const videoOutputPath = needsAudioMix ? outputPath.replace(/\.(mp4|webm)$/, ".temp.$1") : outputPath;
 
   if (shots.length === 1) {
     const s = shots[0];
@@ -144,12 +163,15 @@ export async function assembleVideo(options: AssemblyOptions): Promise<void> {
     if (filters.length > 0) {
       args.push("-vf", filters.join(","));
     }
-    args.push("-c:v", "libx264", "-pix_fmt", "yuv420p", "-y", outputPath);
+    args.push("-c:v", "libx264", "-pix_fmt", "yuv420p", "-y", videoOutputPath);
     await execFileAsync(config.FFMPEG_PATH, args, { timeout: 120000 });
-    return;
+
+    if (!needsAudioMix) return;
+    // Fall through to audio mix
   }
 
-  // Multi-shot: build per-shot reframe filters, then xfade chain
+  // Multi-shot (shots.length > 1): build per-shot reframe filters, then xfade chain
+  if (shots.length > 1) {
   const inputs: string[] = [];
   const preFilters: string[] = [];
 
@@ -202,10 +224,10 @@ export async function assembleVideo(options: AssemblyOptions): Promise<void> {
     "-pix_fmt",
     "yuv420p",
     "-y",
-    outputPath,
+    videoOutputPath,
   ];
 
-  logger.info({ outputPath, shotCount: shots.length, needsReframe }, "Running FFmpeg assembly");
+  logger.info({ outputPath: videoOutputPath, shotCount: shots.length, needsReframe }, "Running FFmpeg assembly");
 
   try {
     const { stderr } = await execFileAsync(config.FFMPEG_PATH, args, { timeout: 180000 });
@@ -213,5 +235,29 @@ export async function assembleVideo(options: AssemblyOptions): Promise<void> {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(`FFmpeg assembly failed: ${message}`);
+  }
+  }
+
+  // ── Audio mix (primary TTS + optional background music) ──
+  if (needsAudioMix && (primaryAudioPath || backgroundMusicPath)) {
+    const filter =
+      primaryAudioPath && backgroundMusicPath
+        ? `[1:a]volume=1[voice];[2:a]volume=${backgroundMusicVolume},apad[music];[voice][music]amix=inputs=2:duration=shortest[a]`
+        : primaryAudioPath
+          ? "[1:a]acopy[a]"
+          : `[1:a]volume=${backgroundMusicVolume}[a]`;
+
+    const mixArgs = [
+      "-i", videoOutputPath,
+      ...(primaryAudioPath ? ["-i", primaryAudioPath] : []),
+      ...(backgroundMusicPath ? ["-i", backgroundMusicPath] : []),
+      "-filter_complex", filter,
+      "-map", "0:v", "-map", "[a]",
+      "-c:v", "copy", "-c:a", "aac", "-shortest", "-y", outputPath,
+    ];
+    await execFileAsync(config.FFMPEG_PATH, mixArgs, { timeout: 60000 });
+    const { unlink } = await import("node:fs/promises");
+    await unlink(videoOutputPath).catch(() => {});
+    logger.info({ outputPath }, "Audio mix complete");
   }
 }

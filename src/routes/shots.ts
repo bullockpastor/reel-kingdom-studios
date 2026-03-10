@@ -24,6 +24,25 @@ export async function shotRoutes(app: FastifyInstance) {
     return shot;
   });
 
+  // PATCH /shots/:id — Update shot fields (trimStart, trimEnd)
+  app.patch("/:id", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = (request.body || {}) as { trimStart?: number; trimEnd?: number };
+
+    const shot = await db.shot.findUnique({ where: { id } });
+    if (!shot) return reply.status(404).send({ error: "Shot not found" });
+
+    const data: { trimStart?: number; trimEnd?: number } = {};
+    if (typeof body.trimStart === "number" && body.trimStart >= 0) data.trimStart = body.trimStart;
+    if (typeof body.trimEnd === "number" && body.trimEnd >= 0) data.trimEnd = body.trimEnd;
+
+    const updated = await db.shot.update({
+      where: { id },
+      data,
+    });
+    return updated;
+  });
+
   // POST /shots/:id/render — Render an individual shot
   app.post("/:id/render", async (request, reply) => {
     const { id } = request.params as { id: string };

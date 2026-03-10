@@ -1,4 +1,5 @@
 import type { LLMProvider, StoryboardResult } from "./llm-provider.interface.js";
+import type { AgentChatProvider, ChatMessage, ChatOptions } from "./agent-chat.interface.js";
 import { storyboardResultSchema, storyboardJsonSchema } from "../../schemas/storyboard.schema.js";
 import { config } from "../../config.js";
 import { logger } from "../../utils/logger.js";
@@ -22,8 +23,40 @@ Also provide:
 
 Make prompts highly detailed and visual. Think like a cinematographer.`;
 
-export class OllamaProvider implements LLMProvider {
+export class OllamaProvider implements LLMProvider, AgentChatProvider {
   readonly name = "ollama";
+  readonly providerKey = "ollama" as const;
+
+  isAvailable(): boolean {
+    return true; // always reachable (errors surface at call time)
+  }
+
+  async chat(messages: ChatMessage[], options?: ChatOptions): Promise<string> {
+    const model = options?.model ?? config.OLLAMA_MODEL;
+    const body: Record<string, unknown> = {
+      model,
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      stream: false,
+      options: { temperature: options?.temperature ?? 0.7 },
+    };
+    if (options?.outputSchema) {
+      body.format = options.outputSchema;
+    }
+
+    const response = await fetch(`${config.OLLAMA_URL}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ollama returned ${response.status}: ${await response.text()}`);
+    }
+
+    const data = (await response.json()) as { message?: { content?: string } };
+    return data.message?.content ?? "";
+  }
+
 
   async generateStoryboard(
     idea: string,

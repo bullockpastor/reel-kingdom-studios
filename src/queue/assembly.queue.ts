@@ -22,6 +22,8 @@ export interface AssemblyJobData {
     reframeFocus: string;
     reframePan: string;
   }>;
+  primaryAudioPath?: string;
+  backgroundMusicPath?: string;
 }
 
 export const assemblyQueue = new Queue<AssemblyJobData>("assembly", {

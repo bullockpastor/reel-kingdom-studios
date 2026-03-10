@@ -50,6 +50,8 @@ model Shot {
   mood            String?
   reframeFocus      String         @default("center")  // center | left | right | upper | lower
   reframePan        String         @default("none")    // none | slow_ltr | slow_rtl
+  trimStart         Float          @default(0)          // seconds to trim from start
+  trimEnd           Float          @default(0)          // seconds to trim from end
   status            String         @default("pending") // pending | queued | rendering | rendered | failed | premium_routed
   renderPath        String?
   renderEngine      String?

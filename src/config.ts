@@ -54,6 +54,22 @@ const configSchema = z.object({
   DEFAULT_OUTPUT_FORMAT: z.enum(["mp4", "webm"]).default("mp4"),
 
   QC_MAX_FAILURES_BEFORE_PREMIUM: z.coerce.number().default(2),
+
+  // Visual QC (vision model for frame-based quality check)
+  VISUAL_QC_PROVIDER: z.enum(["openai", "anthropic", "google"]).optional().or(z.literal("")).transform((v) => v || undefined),
+  VISUAL_QC_MODEL: z.string().optional(),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  GEMINI_API_KEY: z.string().optional(),
+  PREMIUM_POLL_TIMEOUT_MS: z.coerce.number().default(600_000),
+
+  // Audio (TTS, music)
+  ELEVENLABS_API_KEY: z.string().optional(),
+  ELEVENLABS_VOICE_ID: z.string().default("21m00Tcm4TlvDq8ikWAM"), // Rachel
+  AUDIO_LIBRARY_PATH: z.string().optional(),
+
+  // Cost caps (optional, reject/warn premium when exceeded)
+  PREMIUM_MONTHLY_CAP: z.coerce.number().optional(),
+  PREMIUM_PROJECT_CAP: z.coerce.number().optional(),
 });
 
 export type Config = z.infer<typeof configSchema>;

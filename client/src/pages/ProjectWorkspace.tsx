@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { useProject, useGenerateStoryboard, useRenderAll, useAssemble } from "@/api/hooks";
+import { useProject, useGenerateStoryboard, useRenderAll, useAssemble, useAudioLibrary } from "@/api/hooks";
 import { StatusBadge } from "@/components/project/StatusBadge";
 import { ShotGrid } from "@/components/project/ShotGrid";
 import { VideoPlayer } from "@/components/project/VideoPlayer";
@@ -9,6 +9,7 @@ import { timeAgo } from "@/lib/utils";
 import { ArrowLeft, Loader2, Wand2, Play, Film } from "lucide-react";
 
 type Tab = "overview" | "storyboard" | "assembly";
+type RenderAllEngine = "plan" | "local" | "premium";
 
 export function ProjectWorkspace() {
   const { id } = useParams<{ id: string }>();
@@ -16,7 +17,10 @@ export function ProjectWorkspace() {
   const generateStoryboard = useGenerateStoryboard();
   const renderAll = useRenderAll();
   const assemble = useAssemble();
+  const { data: audioLibrary } = useAudioLibrary();
   const [tab, setTab] = useState<Tab>("overview");
+  const [renderAllEngine, setRenderAllEngine] = useState<RenderAllEngine>("plan");
+  const [backgroundMusic, setBackgroundMusic] = useState<string>("");
 
   if (isLoading || !project) {
     return (
@@ -93,17 +97,36 @@ export function ProjectWorkspace() {
           )}
 
           {project.status === "storyboarded" && shots.length > 0 && (
-            <button
-              onClick={() => renderAll.mutate(id!)}
-              disabled={renderAll.isPending}
-              className="flex items-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-            >
-              {renderAll.isPending ? (
-                <><Loader2 size={16} className="animate-spin" /> Queuing...</>
-              ) : (
-                <><Play size={16} /> Render All Shots</>
-              )}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={renderAllEngine}
+                onChange={(e) => setRenderAllEngine(e.target.value as RenderAllEngine)}
+                className="bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent"
+              >
+                <option value="plan">Use plan (per-shot)</option>
+                <option value="local">Force local</option>
+                <option value="premium">Force premium</option>
+              </select>
+              <button
+                onClick={() =>
+                  renderAll.mutate({
+                    id: id!,
+                    engine:
+                      renderAllEngine === "plan"
+                        ? undefined
+                        : (renderAllEngine as "local" | "premium"),
+                  })
+                }
+                disabled={renderAll.isPending}
+                className="flex items-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+              >
+                {renderAll.isPending ? (
+                  <><Loader2 size={16} className="animate-spin" /> Queuing...</>
+                ) : (
+                  <><Play size={16} /> Render All Shots</>
+                )}
+              </button>
+            </div>
           )}
 
           {anyRendering && (
@@ -114,17 +137,35 @@ export function ProjectWorkspace() {
           )}
 
           {allRendered && project.status !== "assembled" && project.status !== "assembling" && (
-            <button
-              onClick={() => assemble.mutate(id!)}
-              disabled={assemble.isPending}
-              className="flex items-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-            >
-              {assemble.isPending ? (
-                <><Loader2 size={16} className="animate-spin" /> Assembling...</>
-              ) : (
-                <><Film size={16} /> Assemble Video</>
+            <div className="flex flex-wrap items-center gap-2">
+              {audioLibrary?.files && audioLibrary.files.length > 0 && (
+                <select
+                  value={backgroundMusic}
+                  onChange={(e) => setBackgroundMusic(e.target.value)}
+                  className="bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent"
+                >
+                  <option value="">No background music</option>
+                  {audioLibrary.files.map((f) => (
+                    <option key={f} value={f}>{f}</option>
+                  ))}
+                </select>
               )}
-            </button>
+              <button
+                onClick={() =>
+                  assemble.mutate(
+                    backgroundMusic ? { id: id!, backgroundMusicFile: backgroundMusic } : id!
+                  )
+                }
+                disabled={assemble.isPending}
+                className="flex items-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+              >
+                {assemble.isPending ? (
+                  <><Loader2 size={16} className="animate-spin" /> Assembling...</>
+                ) : (
+                  <><Film size={16} /> Assemble Video</>
+                )}
+              </button>
+            </div>
           )}
 
           {project.status === "assembled" && project.outputUrl && (
@@ -157,7 +198,7 @@ export function ProjectWorkspace() {
         </div>
       )}
 
-      {tab === "storyboard" && <ShotGrid shots={shots} />}
+      {tab === "storyboard" && <ShotGrid shots={shots} projectId={id!} />}
 
       {tab === "assembly" && (
         <div className="space-y-4">
@@ -172,15 +213,33 @@ export function ProjectWorkspace() {
               Assembling video...
             </div>
           ) : allRendered ? (
-            <div className="text-center py-8">
+            <div className="text-center py-8 space-y-3">
               <p className="text-text-secondary mb-4">All shots rendered. Ready to assemble.</p>
-              <button
-                onClick={() => assemble.mutate(id!)}
-                disabled={assemble.isPending}
-                className="inline-flex items-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white rounded-lg px-6 py-2 text-sm font-medium transition-colors"
-              >
-                <Film size={16} /> Assemble Video
-              </button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {audioLibrary?.files && audioLibrary.files.length > 0 && (
+                  <select
+                    value={backgroundMusic}
+                    onChange={(e) => setBackgroundMusic(e.target.value)}
+                    className="bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent"
+                  >
+                    <option value="">No background music</option>
+                    {audioLibrary.files.map((f) => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  onClick={() =>
+                    assemble.mutate(
+                      backgroundMusic ? { id: id!, backgroundMusicFile: backgroundMusic } : id!
+                    )
+                  }
+                  disabled={assemble.isPending}
+                  className="inline-flex items-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white rounded-lg px-6 py-2 text-sm font-medium transition-colors"
+                >
+                  <Film size={16} /> Assemble Video
+                </button>
+              </div>
             </div>
           ) : (
             <p className="text-text-muted text-sm">Render all shots first before assembling.</p>

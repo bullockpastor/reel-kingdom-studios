@@ -5,10 +5,11 @@ import type {
   PremiumRenderCapabilities,
 } from "./premium.types.js";
 import { downloadVideoFile, sleep, msElapsed } from "./download.utils.js";
+import { fetchWithRetry } from "../../../utils/retry.js";
+import { config } from "../../../config.js";
 
 const KLING_BASE = "https://api.klingai.com/v1";
 const POLL_INTERVAL_MS = 5_000;
-const MAX_WAIT_MS = 600_000;
 
 type KlingStatus = "submitted" | "processing" | "succeed" | "failed";
 
@@ -58,7 +59,7 @@ export class KlingVideoProvider implements IPremiumVideoProvider {
   async render(req: PremiumRenderRequest): Promise<PremiumRenderResult> {
     const startMs = Date.now();
 
-    const createResp = await fetch(`${KLING_BASE}/videos/text2video`, {
+    const createResp = await fetchWithRetry(`${KLING_BASE}/videos/text2video`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify({
@@ -94,11 +95,11 @@ export class KlingVideoProvider implements IPremiumVideoProvider {
 
     const taskId = createData.data.task_id;
 
-    const deadline = startMs + MAX_WAIT_MS;
+    const deadline = startMs + config.PREMIUM_POLL_TIMEOUT_MS;
     while (Date.now() < deadline) {
       await sleep(POLL_INTERVAL_MS);
 
-      const pollResp = await fetch(`${KLING_BASE}/videos/text2video/${taskId}`, {
+      const pollResp = await fetchWithRetry(`${KLING_BASE}/videos/text2video/${taskId}`, {
         headers: this.headers(),
       });
 
@@ -145,7 +146,7 @@ export class KlingVideoProvider implements IPremiumVideoProvider {
       success: false,
       provider: "kling_video",
       requestId: taskId,
-      error: `Kling task timed out after ${MAX_WAIT_MS / 1000}s`,
+      error: `Kling task timed out after ${config.PREMIUM_POLL_TIMEOUT_MS / 1000}s`,
       durationMs: msElapsed(startMs),
     };
   }

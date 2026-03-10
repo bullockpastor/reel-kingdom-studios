@@ -25,6 +25,7 @@ export default defineConfig({
       "/queue": "http://localhost:8010",
       "/presenter": "http://localhost:8010",
       "/engines": "http://localhost:8010",
+      "/model-router": "http://localhost:8010",
     },
   },
 });

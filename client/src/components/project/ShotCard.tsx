@@ -1,21 +1,73 @@
+import { useState } from "react";
 import type { Shot } from "@/api/types";
 import { StatusBadge } from "./StatusBadge";
 import { VideoPlayer } from "./VideoPlayer";
-import { useRenderShot } from "@/api/hooks";
-import { Loader2, Play, RotateCcw } from "lucide-react";
+import { useRenderShot, useUpdateShot } from "@/api/hooks";
+import { Loader2, Play, RotateCcw, GripVertical } from "lucide-react";
 
-export function ShotCard({ shot }: { shot: Shot }) {
+const PREMIUM_PROVIDERS = [
+  { value: "runway_gen4", label: "Runway Gen4" },
+  { value: "openai_sora", label: "OpenAI Sora" },
+  { value: "google_veo", label: "Google Veo" },
+  { value: "kling_video", label: "Kling Video" },
+] as const;
+
+export function ShotCard({
+  shot,
+  projectId,
+  draggable,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+}: {
+  shot: Shot;
+  projectId?: string;
+  draggable?: boolean;
+  onDragStart?: (e: React.DragEvent) => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDrop?: (e: React.DragEvent) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
+}) {
   const renderShot = useRenderShot();
+  const updateShot = useUpdateShot();
+  const [engine, setEngine] = useState<"local" | "premium">(
+    shot.status === "failed" && (shot.qcFailCount ?? 0) >= 2 ? "premium" : "local"
+  );
+  const [provider, setProvider] = useState<string>("runway_gen4");
 
   const canRender = shot.status === "pending" || shot.status === "failed";
   const isRendering = shot.status === "rendering" || shot.status === "queued";
+  const suggestPremium = shot.status === "failed" && (shot.qcFailCount ?? 0) >= 2;
 
   function handleRender() {
-    renderShot.mutate({ id: shot.id });
+    const opts: Record<string, unknown> = { engine };
+    if (engine === "premium") opts.provider = provider;
+    renderShot.mutate({ id: shot.id, opts });
   }
 
+  const handleTrimBlur = (field: "trimStart" | "trimEnd") => (e: React.FocusEvent<HTMLInputElement>) => {
+    const v = parseFloat(e.target.value);
+    if (!Number.isNaN(v) && v >= 0) {
+      const cur = field === "trimStart" ? (shot.trimStart ?? 0) : (shot.trimEnd ?? 0);
+      if (Math.abs(v - cur) > 0.01) updateShot.mutate({ shotId: shot.id, data: { [field]: v } });
+    }
+  };
+
   return (
-    <div className="bg-surface-elevated border border-border rounded-lg overflow-hidden">
+    <div
+      className={`relative bg-surface-elevated border border-border rounded-lg overflow-hidden ${draggable ? "cursor-grab active:cursor-grabbing" : ""}`}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+    >
+      {draggable && (
+        <div className="absolute left-1 top-1 z-10 text-text-muted opacity-60 hover:opacity-100">
+          <GripVertical size={14} />
+        </div>
+      )}
       {/* Video preview or placeholder */}
       <div className="aspect-video bg-black relative">
         {shot.renderUrl && shot.status === "rendered" ? (
@@ -40,6 +92,34 @@ export function ShotCard({ shot }: { shot: Shot }) {
           <StatusBadge status={shot.status} />
         </div>
 
+        {/* Trim overrides — shown when shot is rendered */}
+        {shot.status === "rendered" && (
+          <div className="flex gap-2 text-[10px]">
+            <label className="flex items-center gap-1 text-text-muted">
+              trim↑
+              <input
+                type="number"
+                min={0}
+                step={0.1}
+                defaultValue={shot.trimStart ?? 0}
+                onBlur={handleTrimBlur("trimStart")}
+                className="w-12 bg-surface border border-border rounded px-1 py-0.5 text-text-primary"
+              />
+            </label>
+            <label className="flex items-center gap-1 text-text-muted">
+              trim↓
+              <input
+                type="number"
+                min={0}
+                step={0.1}
+                defaultValue={shot.trimEnd ?? 0}
+                onBlur={handleTrimBlur("trimEnd")}
+                className="w-12 bg-surface border border-border rounded px-1 py-0.5 text-text-primary"
+              />
+            </label>
+          </div>
+        )}
+
         <p className="text-xs text-text-secondary line-clamp-3">{shot.prompt}</p>
 
         <div className="flex items-center gap-3 text-xs text-text-muted">
@@ -60,21 +140,47 @@ export function ShotCard({ shot }: { shot: Shot }) {
 
         {/* Actions */}
         {canRender && (
-          <button
-            onClick={handleRender}
-            disabled={renderShot.isPending}
-            className="w-full flex items-center justify-center gap-2 bg-accent/10 hover:bg-accent/20 text-accent rounded-md py-1.5 text-xs font-medium transition-colors"
-          >
-            {shot.status === "failed" ? (
-              <>
-                <RotateCcw size={12} /> Re-render
-              </>
-            ) : (
-              <>
-                <Play size={12} /> Render Draft
-              </>
-            )}
-          </button>
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <select
+                value={engine}
+                onChange={(e) => setEngine(e.target.value as "local" | "premium")}
+                className="flex-1 bg-surface border border-border rounded-md px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent"
+              >
+                <option value="local">Local (ComfyUI)</option>
+                <option value="premium">Premium</option>
+              </select>
+              {engine === "premium" && (
+                <select
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value)}
+                  className="flex-1 bg-surface border border-border rounded-md px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent"
+                >
+                  {PREMIUM_PROVIDERS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <button
+              onClick={handleRender}
+              disabled={renderShot.isPending}
+              className="w-full flex items-center justify-center gap-2 bg-accent/10 hover:bg-accent/20 text-accent rounded-md py-1.5 text-xs font-medium transition-colors"
+            >
+              {shot.status === "failed" ? (
+                <>
+                  <RotateCcw size={12} />
+                  {suggestPremium ? "Retry with Premium" : "Re-render"}
+                </>
+              ) : (
+                <>
+                  <Play size={12} /> Render Draft
+                </>
+              )}
+            </button>
+          </div>
         )}
       </div>
     </div>

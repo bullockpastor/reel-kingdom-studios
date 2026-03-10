@@ -1,4 +1,4 @@
-import type { Project, Shot, HealthResponse, QueueStatus, Presenter, PresenterScript, Engine, ComparisonResult } from "./types";
+import type { Project, Shot, HealthResponse, QueueStatus, Presenter, PresenterScript, Engine, ComparisonResult, RouteTableEntry, ResolvedRoute } from "./types";
 
 const BASE = "";
 
@@ -34,10 +34,28 @@ export const api = {
       method: "POST",
       body: JSON.stringify(engine ? { engine } : {}),
     }),
-  assemble: (id: string, opts?: { transitionDuration?: number; outputFormat?: "mp4" | "webm" }) =>
+  assemble: (
+    id: string,
+    opts?: {
+      transitionDuration?: number;
+      outputFormat?: "mp4" | "webm";
+      backgroundMusicFile?: string;
+    }
+  ) =>
     request<{ message: string; jobId: string; outputPath: string }>(`/projects/${id}/assemble`, {
       method: "POST",
       body: JSON.stringify(opts || {}),
+    }),
+  listAudioLibrary: () => request<{ files: string[] }>("/projects/audio-library"),
+  reorderShots: (projectId: string, shotIds: string[]) =>
+    request<{ shots: Shot[] }>(`/projects/${projectId}/shots/reorder`, {
+      method: "PATCH",
+      body: JSON.stringify({ shotIds }),
+    }),
+  updateShot: (shotId: string, data: { trimStart?: number; trimEnd?: number }) =>
+    request<Shot>(`/shots/${shotId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
     }),
 
   // Shots
@@ -50,6 +68,15 @@ export const api = {
 
   // Queue
   queueStatus: () => request<QueueStatus>("/queue"),
+
+  // Costs
+  getCostSummary: () =>
+    request<{
+      monthlySpend: number;
+      monthlyCap: number | null;
+      byProvider: Record<string, number>;
+      byProject: Array<{ projectId: string; spend: number }>;
+    }>("/costs"),
 
   // Asset URL helper
   assetUrl: (relativePath: string) => `/assets/${relativePath}`,
@@ -100,4 +127,19 @@ export const api = {
   compareEngines: (data: { prompt: string; engines: string[]; durationSeconds?: number }) =>
     request<ComparisonResult>("/engines/compare", { method: "POST", body: JSON.stringify(data) }),
   getComparison: (id: string) => request<ComparisonResult>(`/engines/compare/${id}`),
+
+  // Model Router
+  listAgentRoutes: () => request<{ routes: RouteTableEntry[] }>("/model-router/routes"),
+  setAgentRoute: (data: { agentName: string; provider: string; model?: string }) =>
+    request<{ routes: RouteTableEntry[] }>("/model-router/routes", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  deleteAgentRoute: (agentName: string) =>
+    request<{ routes: RouteTableEntry[] }>(
+      `/model-router/routes/${encodeURIComponent(agentName)}`,
+      { method: "DELETE" }
+    ),
+  resolveRoute: (agentName: string) =>
+    request<ResolvedRoute>(`/model-router/resolve/${encodeURIComponent(agentName)}`),
 };

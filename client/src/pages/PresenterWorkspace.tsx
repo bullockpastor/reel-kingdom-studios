@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { usePresenterProject, useDirectPresenterProject, useProducePresenterProject, useAssemble } from "@/api/hooks";
+import { usePresenterProject, useDirectPresenterProject, useProducePresenterProject, useAssemble, useAudioLibrary } from "@/api/hooks";
 import { StatusBadge } from "@/components/project/StatusBadge";
 import { ShotGrid } from "@/components/project/ShotGrid";
 import { VideoPlayer } from "@/components/project/VideoPlayer";
@@ -46,8 +46,10 @@ export function PresenterWorkspace() {
   const direct = useDirectPresenterProject();
   const produce = useProducePresenterProject();
   const assemble = useAssemble();
+  const { data: audioLibrary } = useAudioLibrary();
 
   const [tab, setTab] = useState<Tab>("overview");
+  const [backgroundMusic, setBackgroundMusic] = useState<string>("");
   const [showProviderPicker, setShowProviderPicker] = useState(false);
   const [expandedVisuals, setExpandedVisuals] = useState<Set<number>>(new Set());
 
@@ -215,17 +217,35 @@ export function PresenterWorkspace() {
 
             {/* Assemble */}
             {allRendered && project.status !== "assembled" && project.status !== "assembling" && (
-              <button
-                onClick={() => assemble.mutate(id!)}
-                disabled={assemble.isPending}
-                className="flex items-center gap-2 border border-border hover:border-accent/50 disabled:opacity-50 text-text-secondary hover:text-text-primary rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-              >
-                {assemble.isPending ? (
-                  <><Loader2 size={14} className="animate-spin" /> Assembling…</>
-                ) : (
-                  <><Film size={14} /> Assemble</>
+              <div className="flex flex-wrap items-center gap-2">
+                {audioLibrary?.files && audioLibrary.files.length > 0 && (
+                  <select
+                    value={backgroundMusic}
+                    onChange={(e) => setBackgroundMusic(e.target.value)}
+                    className="bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent"
+                  >
+                    <option value="">No background music</option>
+                    {audioLibrary.files.map((f) => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
                 )}
-              </button>
+                <button
+                  onClick={() =>
+                    assemble.mutate(
+                      backgroundMusic ? { id: id!, backgroundMusicFile: backgroundMusic } : id!
+                    )
+                  }
+                  disabled={assemble.isPending}
+                  className="flex items-center gap-2 border border-border hover:border-accent/50 disabled:opacity-50 text-text-secondary hover:text-text-primary rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                >
+                  {assemble.isPending ? (
+                    <><Loader2 size={14} className="animate-spin" /> Assembling…</>
+                  ) : (
+                    <><Film size={14} /> Assemble</>
+                  )}
+                </button>
+              </div>
             )}
           </div>
 
@@ -393,7 +413,7 @@ export function PresenterWorkspace() {
       )}
 
       {/* ── Shots Tab ── */}
-      {tab === "shots" && <ShotGrid shots={shots} />}
+      {tab === "shots" && <ShotGrid shots={shots} projectId={id!} />}
     </div>
   );
 }

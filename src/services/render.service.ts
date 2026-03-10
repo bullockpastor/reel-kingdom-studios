@@ -1,6 +1,7 @@
 import type { Shot, Project } from "@prisma/client";
 import { db } from "../db.js";
 import { renderQueue } from "../queue/render.queue.js";
+import { checkBudgetBeforePremium } from "./cost.service.js";
 import { runAgent, renderOrchestratorAgent } from "../agents/index.js";
 import { projectShotsDir } from "../storage/studio-root.js";
 import { logger } from "../utils/logger.js";
@@ -10,6 +11,7 @@ interface RenderOptions {
   width: number;
   height: number;
   fps: number;
+  steps?: number;
   seed?: number;
   cinemaMode?: boolean;
   /** Per-shot provider override. Falls back to PREMIUM_VIDEO_PROVIDER env var. */
@@ -27,6 +29,7 @@ export async function queueRender(
   // Determine trigger reason for premium
   let triggerReason: "cinema_mode" | "qc_fail_twice" | "manual" | undefined;
   if (options.engine === "premium") {
+    await checkBudgetBeforePremium(shot.projectId);
     if (options.cinemaMode) triggerReason = "cinema_mode";
     else if (shot.qcFailCount >= 2) triggerReason = "qc_fail_twice";
     else triggerReason = "manual";
@@ -53,6 +56,7 @@ export async function queueRender(
     width: options.width,
     height: options.height,
     fps: options.fps,
+    steps: options.steps,
     seed: options.seed,
     outputDir,
     triggerReason,

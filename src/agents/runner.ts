@@ -1,11 +1,10 @@
-import { getLLMProvider } from "../providers/llm/index.js";
-import { config } from "../config.js";
+import { resolveAgentRoute, getProviderInstance } from "../services/model-router.service.js";
 import { logger } from "../utils/logger.js";
 
 export interface AgentDefinition {
   name: string;
   systemPrompt: string;
-  outputSchema?: Record<string, unknown>; // JSON Schema for Ollama structured output
+  outputSchema?: Record<string, unknown>; // JSON Schema for structured output
   temperature?: number;
 }
 
@@ -17,8 +16,8 @@ export interface AgentRunResult {
 }
 
 /**
- * Run a single agent: sends systemPrompt + userInput to the LLM and returns the response.
- * If outputSchema is provided, Ollama's `format` param constrains the output to valid JSON.
+ * Run a single agent: sends systemPrompt + userInput to the routed LLM provider.
+ * The provider is determined by the Model Router (settings.json overrides → static defaults → Ollama fallback).
  */
 export async function runAgent(
   agent: AgentDefinition,
@@ -26,37 +25,26 @@ export async function runAgent(
 ): Promise<AgentRunResult> {
   const start = Date.now();
 
-  logger.info({ agent: agent.name }, `Running agent: ${agent.name}`);
+  const route = resolveAgentRoute(agent.name);
+  const llm = getProviderInstance(route);
 
-  const ollamaUrl = config.OLLAMA_URL;
-  const model = config.OLLAMA_MODEL;
+  logger.info(
+    { agent: agent.name, provider: route.provider, model: route.model, reason: route.reason },
+    `Running agent: ${agent.name} via ${route.provider}`
+  );
 
-  const body: Record<string, unknown> = {
-    model,
-    messages: [
+  const rawOutput = await llm.chat(
+    [
       { role: "system", content: agent.systemPrompt },
       { role: "user", content: userInput },
     ],
-    stream: false,
-    options: { temperature: agent.temperature ?? 0.7 },
-  };
+    {
+      temperature: agent.temperature,
+      outputSchema: agent.outputSchema,
+      model: route.model,
+    }
+  );
 
-  if (agent.outputSchema) {
-    body.format = agent.outputSchema;
-  }
-
-  const response = await fetch(`${ollamaUrl}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Ollama returned ${response.status}: ${await response.text()}`);
-  }
-
-  const data = (await response.json()) as { message?: { content?: string } };
-  const rawOutput = data.message?.content || "";
   const durationMs = Date.now() - start;
 
   let parsed: unknown = rawOutput;
@@ -68,7 +56,7 @@ export async function runAgent(
     }
   }
 
-  logger.info({ agent: agent.name, durationMs }, `Agent ${agent.name} completed`);
+  logger.info({ agent: agent.name, provider: route.provider, durationMs }, `Agent ${agent.name} completed`);
 
   return { agentName: agent.name, rawOutput, parsed, durationMs };
 }

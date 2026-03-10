@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Film, ListOrdered, Video, Cpu } from "lucide-react";
+import { LayoutDashboard, Film, ListOrdered, Video, Cpu, GitBranch } from "lucide-react";
 
 const links = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -8,6 +8,7 @@ const links = [
   { to: "/queue", icon: ListOrdered, label: "Queue" },
   { to: "/presenter", icon: Video, label: "Presenter" },
   { to: "/engines", icon: Cpu, label: "Engines" },
+  { to: "/model-router", icon: GitBranch, label: "Model Router" },
 ];
 
 export function Sidebar() {

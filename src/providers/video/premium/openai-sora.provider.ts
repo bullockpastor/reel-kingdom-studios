@@ -7,10 +7,11 @@ import type {
   PremiumRenderCapabilities,
 } from "./premium.types.js";
 import { downloadVideoFile, sleep, msElapsed } from "./download.utils.js";
+import { fetchWithRetry } from "../../../utils/retry.js";
+import { config } from "../../../config.js";
 
 const SORA_BASE = "https://api.openai.com/v1/video/generations";
 const POLL_INTERVAL_MS = 10_000;
-const MAX_WAIT_MS = 600_000; // 10 minutes
 
 interface SoraJobResponse {
   id: string;
@@ -52,7 +53,7 @@ export class OpenAISoraProvider implements IPremiumVideoProvider {
   async render(req: PremiumRenderRequest): Promise<PremiumRenderResult> {
     const startMs = Date.now();
 
-    const createResp = await fetch(SORA_BASE, {
+    const createResp = await fetchWithRetry(SORA_BASE, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify({
@@ -77,11 +78,11 @@ export class OpenAISoraProvider implements IPremiumVideoProvider {
     const createData = (await createResp.json()) as SoraJobResponse;
     const jobId = createData.id;
 
-    const deadline = startMs + MAX_WAIT_MS;
+    const deadline = startMs + config.PREMIUM_POLL_TIMEOUT_MS;
     while (Date.now() < deadline) {
       await sleep(POLL_INTERVAL_MS);
 
-      const pollResp = await fetch(`${SORA_BASE}/${jobId}`, {
+      const pollResp = await fetchWithRetry(`${SORA_BASE}/${jobId}`, {
         headers: this.headers(),
       });
 
@@ -145,7 +146,7 @@ export class OpenAISoraProvider implements IPremiumVideoProvider {
       success: false,
       provider: "openai_sora",
       requestId: jobId,
-      error: `Sora job timed out after ${MAX_WAIT_MS / 1000}s`,
+      error: `Sora job timed out after ${config.PREMIUM_POLL_TIMEOUT_MS / 1000}s`,
       durationMs: msElapsed(startMs),
     };
   }

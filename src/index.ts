@@ -12,6 +12,8 @@ import { assetRoutes } from "./routes/assets.js";
 import { queueRoutes } from "./routes/queue.js";
 import { presenterRoutes } from "./routes/presenter.js";
 import { engineRoutes } from "./routes/engines.js";
+import { costRoutes } from "./routes/costs.js";
+import { modelRouterRoutes } from "./routes/model-router.js";
 import "./queue/render.worker.js";
 import "./queue/assembly.worker.js";
 
@@ -56,6 +58,8 @@ app.register(assetRoutes, { prefix: "/assets" });
 app.register(queueRoutes, { prefix: "/queue" });
 app.register(presenterRoutes, { prefix: "/presenter" });
 app.register(engineRoutes,   { prefix: "/engines" });
+app.register(costRoutes,     { prefix: "/costs" });
+app.register(modelRouterRoutes, { prefix: "/model-router" });
 
 // Global error handler
 app.setErrorHandler((error: Error, _request, reply) => {

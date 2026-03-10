@@ -5,6 +5,10 @@ import { db } from "../db.js";
 import { getLocalRenderer, getPremiumVideoProvider } from "../providers/video/index.js";
 import { runAgent, visualQCAgent } from "../agents/index.js";
 import { shotRenderDir } from "../storage/studio-root.js";
+import { queueRender } from "../services/render.service.js";
+import { extractFrames } from "../utils/frame-extractor.js";
+import { runVisionQC } from "../services/visual-qc.service.js";
+import { join } from "node:path";
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
 
@@ -96,34 +100,61 @@ const worker = new Worker<RenderJobData>(
         });
       }
 
-      // ── Agent 6: Visual QC ──
-      logger.info({ shotId: data.shotId }, "Running Visual QC agent");
-      const qcResult = await runAgent(visualQCAgent, JSON.stringify({
-        shotIndex: 0,
-        originalPrompt: data.prompt,
-        engine: data.engine,
-        renderDurationMs: durationMs,
-        resolution: `${data.width}x${data.height}`,
-        fps: data.fps,
-        steps: data.steps,
-        durationSeconds: data.durationSeconds,
-        renderSuccess: true,
-        filePath,
-      }));
-
-      const qcOutput = qcResult.parsed as {
+      // ── Visual QC: vision-based (if configured) + metadata agent fallback ──
+      type QCOutput = {
         pass: boolean;
         score: number;
         recommendation: string;
         issues: Array<{ type: string; severity: string; description: string }>;
       };
+      let qcOutput: QCOutput;
+
+      const runMetadataQC = async (): Promise<QCOutput> => {
+        const qcResult = await runAgent(visualQCAgent, JSON.stringify({
+          shotIndex: 0,
+          originalPrompt: data.prompt,
+          engine: data.engine,
+          renderDurationMs: durationMs,
+          resolution: `${data.width}x${data.height}`,
+          fps: data.fps,
+          steps: data.steps,
+          durationSeconds: data.durationSeconds,
+          renderSuccess: true,
+          filePath,
+        }));
+        return qcResult.parsed as QCOutput;
+      };
+
+      if (filePath && config.VISUAL_QC_PROVIDER) {
+        try {
+          const framesDir = join(shotRenderDir(data.projectId, data.shotId, "draft"), "qc_frames");
+          const frames = await extractFrames(filePath, framesDir, 3);
+          const visionResult = await runVisionQC(data.prompt, frames);
+          if (visionResult) {
+            qcOutput = {
+              pass: visionResult.pass,
+              score: visionResult.score,
+              recommendation: visionResult.recommendation,
+              issues: visionResult.issues,
+            };
+            logger.info({ shotId: data.shotId, score: visionResult.score }, "Vision QC completed");
+          } else {
+            qcOutput = await runMetadataQC();
+          }
+        } catch {
+          logger.warn({ shotId: data.shotId }, "Vision QC failed — using metadata QC");
+          qcOutput = await runMetadataQC();
+        }
+      } else {
+        logger.info({ shotId: data.shotId }, "Running metadata-only Visual QC agent");
+        qcOutput = await runMetadataQC();
+      }
 
       const qcScore = typeof qcOutput.score === "number" ? qcOutput.score : 0.7;
 
-      // Score-floor override: the QC agent evaluates blind (no actual video).
-      // If the score is good enough, accept regardless of LLM recommendation.
+      // Score-floor override for metadata-only QC. When vision QC runs, trust its output.
       const QC_ACCEPT_FLOOR = 0.65;
-      if (qcScore >= QC_ACCEPT_FLOOR && qcOutput.recommendation !== "accept") {
+      if (!config.VISUAL_QC_PROVIDER && qcScore >= QC_ACCEPT_FLOOR && qcOutput.recommendation !== "accept") {
         logger.warn(
           { shotId: data.shotId, qcScore, originalRecommendation: qcOutput.recommendation },
           "QC score above floor — overriding recommendation to accept"
@@ -139,7 +170,7 @@ const worker = new Worker<RenderJobData>(
 
       // Handle QC result
       if (qcOutput.recommendation === "retry_premium" && data.engine === "comfyui") {
-        // QC says retry with premium
+        // QC says retry with premium — record local failure, then auto-queue premium
         await db.shot.update({
           where: { id: data.shotId },
           data: {
@@ -152,6 +183,25 @@ const worker = new Worker<RenderJobData>(
           },
         });
         logger.warn({ shotId: data.shotId, qcScore }, "QC recommends premium retry");
+
+        // Auto-queue premium render if configured (no second manual click needed)
+        if (config.PREMIUM_VIDEO_PROVIDER) {
+          const shotWithProject = await db.shot.findUnique({
+            where: { id: data.shotId },
+            include: { project: true },
+          });
+          if (shotWithProject?.project) {
+            await queueRender(shotWithProject, {
+              engine: "premium",
+              width: data.width,
+              height: data.height,
+              fps: data.fps,
+              premiumProvider: data.premiumProvider,
+              referenceImagePath: data.referenceImagePath,
+            });
+            logger.info({ shotId: data.shotId }, "Auto-queued premium retry");
+          }
+        }
       } else if (qcOutput.recommendation === "retry_local" && data.engine === "comfyui") {
         await db.shot.update({
           where: { id: data.shotId },
