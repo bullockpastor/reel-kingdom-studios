@@ -53,7 +53,7 @@ export class ComfyUIClient {
   async pollUntilComplete(
     promptId: string,
     intervalMs = 5000,
-    timeoutMs = 600000
+    timeoutMs = config.COMFYUI_RENDER_TIMEOUT_MS
   ): Promise<HistoryEntry> {
     const start = Date.now();
 

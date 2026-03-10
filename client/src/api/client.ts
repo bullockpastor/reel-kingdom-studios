@@ -91,6 +91,8 @@ export const api = {
     defaultTemplateId?: string;
   }) => request<Presenter>("/presenter/profiles", { method: "POST", body: JSON.stringify(data) }),
   getPresenter: (id: string) => request<Presenter>(`/presenter/profiles/${id}`),
+  updatePresenter: (id: string, data: { name?: string; description?: string; voiceId?: string; defaultProvider?: string; defaultTemplateId?: string }) =>
+    request<Presenter>(`/presenter/profiles/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
 
   // Presenter projects
   createPresenterProject: (data: {

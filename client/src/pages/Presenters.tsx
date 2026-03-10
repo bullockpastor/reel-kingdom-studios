@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { usePresenters, useCreatePresenter, useCreatePresenterProject } from "@/api/hooks";
+import { usePresenters, useCreatePresenter, useCreatePresenterProject, useUpdatePresenter } from "@/api/hooks";
 import { StatusBadge } from "@/components/project/StatusBadge";
 import { timeAgo } from "@/lib/utils";
-import { Plus, Loader2, Video, User, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Loader2, Video, User, ChevronDown, ChevronUp, Pencil, Check, X } from "lucide-react";
 import type { Presenter } from "@/api/types";
 
 const PROVIDERS = ["runway_gen4", "openai_sora", "google_veo", "kling_video"];
@@ -329,6 +329,108 @@ export function Presenters() {
 
 function PresenterCard({ presenter, onNewProject }: { presenter: Presenter; onNewProject: () => void }) {
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const updatePresenter = useUpdatePresenter();
+  const [editForm, setEditForm] = useState({
+    name: presenter.name,
+    description: presenter.description,
+    voiceId: presenter.voiceId ?? "",
+    defaultProvider: presenter.defaultProvider,
+    defaultTemplateId: presenter.defaultTemplateId ?? "",
+  });
+
+  async function handleSave() {
+    await updatePresenter.mutateAsync({
+      id: presenter.id,
+      data: {
+        name: editForm.name.trim(),
+        description: editForm.description.trim(),
+        voiceId: editForm.voiceId.trim() || undefined,
+        defaultProvider: editForm.defaultProvider,
+        defaultTemplateId: editForm.defaultTemplateId.trim() || undefined,
+      },
+    });
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <div className="bg-surface-elevated border border-accent/40 rounded-xl p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-text-primary">Edit Presenter</span>
+          <button onClick={() => setEditing(false)} className="text-text-muted hover:text-text-primary">
+            <X size={14} />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-text-muted mb-1">Name</label>
+            <input
+              type="text"
+              value={editForm.name}
+              onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+              className="w-full px-2 py-1.5 bg-surface border border-border rounded text-sm text-text-primary focus:outline-none focus:border-accent"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-text-muted mb-1">Default Provider</label>
+            <select
+              value={editForm.defaultProvider}
+              onChange={(e) => setEditForm((f) => ({ ...f, defaultProvider: e.target.value }))}
+              className="w-full px-2 py-1.5 bg-surface border border-border rounded text-sm text-text-primary focus:outline-none focus:border-accent"
+            >
+              {PROVIDERS.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs text-text-muted mb-1">Voice ID (ElevenLabs)</label>
+          <input
+            type="text"
+            placeholder="e.g. 21m00Tcm4TlvDq8ikWAM"
+            value={editForm.voiceId}
+            onChange={(e) => setEditForm((f) => ({ ...f, voiceId: e.target.value }))}
+            className="w-full px-2 py-1.5 bg-surface border border-border rounded text-sm text-text-primary font-mono focus:outline-none focus:border-accent"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-text-muted mb-1">Description</label>
+          <textarea
+            rows={3}
+            value={editForm.description}
+            onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+            className="w-full px-2 py-1.5 bg-surface border border-border rounded text-sm text-text-primary focus:outline-none focus:border-accent resize-none"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-text-muted mb-1">Default Template ID</label>
+          <input
+            type="text"
+            placeholder="dark_wood_pulpit"
+            value={editForm.defaultTemplateId}
+            onChange={(e) => setEditForm((f) => ({ ...f, defaultTemplateId: e.target.value }))}
+            className="w-full px-2 py-1.5 bg-surface border border-border rounded text-sm text-text-primary focus:outline-none focus:border-accent"
+          />
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleSave}
+            disabled={updatePresenter.isPending}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white rounded text-xs font-medium transition-colors"
+          >
+            {updatePresenter.isPending ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+            Save
+          </button>
+          <button
+            onClick={() => setEditing(false)}
+            className="px-3 py-1.5 text-xs text-text-muted hover:text-text-primary transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-surface-elevated border border-border rounded-xl p-4 space-y-3">
@@ -340,13 +442,27 @@ function PresenterCard({ presenter, onNewProject }: { presenter: Presenter; onNe
           </div>
           <p className="text-xs text-text-muted mt-1">{timeAgo(presenter.createdAt)}</p>
         </div>
-        <button
-          onClick={onNewProject}
-          className="flex items-center gap-1 px-2 py-1 bg-accent/10 hover:bg-accent/20 text-accent rounded text-xs font-medium transition-colors whitespace-nowrap"
-        >
-          <Video size={10} /> New Project
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setEditing(true)}
+            className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-hover rounded transition-colors"
+            title="Edit presenter"
+          >
+            <Pencil size={13} />
+          </button>
+          <button
+            onClick={onNewProject}
+            className="flex items-center gap-1 px-2 py-1 bg-accent/10 hover:bg-accent/20 text-accent rounded text-xs font-medium transition-colors whitespace-nowrap"
+          >
+            <Video size={10} /> New Project
+          </button>
+        </div>
       </div>
+      {presenter.voiceId && (
+        <p className="text-xs text-text-muted">
+          Voice: <span className="text-text-secondary font-mono">{presenter.voiceId}</span>
+        </p>
+      )}
       <div>
         <button
           onClick={() => setExpanded((v) => !v)}

@@ -133,6 +133,15 @@ export function usePresenterProject(id: string) {
   });
 }
 
+export function useUpdatePresenter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof api.updatePresenter>[1] }) =>
+      api.updatePresenter(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["presenters"] }),
+  });
+}
+
 export function useCreatePresenterProject() {
   const qc = useQueryClient();
   return useMutation({

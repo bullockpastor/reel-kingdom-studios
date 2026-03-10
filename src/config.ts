@@ -13,6 +13,7 @@ const configSchema = z.object({
   REDIS_URL: z.string().default("redis://localhost:6381"),
 
   COMFYUI_URL: z.string().default("http://127.0.0.1:8188"),
+  COMFYUI_RENDER_TIMEOUT_MS: z.coerce.number().default(1800000), // 30 min — MPS is slow
 
   WAN21_STEPS: z.coerce.number().default(30),
   WAN21_CFG: z.coerce.number().default(6),
