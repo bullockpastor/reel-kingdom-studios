@@ -42,7 +42,7 @@ export async function generateTTS(options: TTSOptions): Promise<string | null> {
       },
       body: JSON.stringify({
         text,
-        model_id: "eleven_monolingual_v1",
+        model_id: "eleven_flash_v2_5",
         voice_settings: { stability, similarity_boost: similarityBoost },
       }),
     }
