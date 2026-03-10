@@ -1,4 +1,4 @@
-export type PremiumProvider = "openai_sora" | "runway_gen4" | "kling_video" | "google_veo";
+export type PremiumProvider = "openai_sora" | "runway_gen4" | "kling_video" | "google_veo" | "fal_wan21";
 
 export interface PremiumRenderRequest {
   shotId: string;

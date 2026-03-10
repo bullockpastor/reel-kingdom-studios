@@ -113,6 +113,23 @@ const ENGINE_CATALOG: EngineMeta[] = [
     ],
   },
   {
+    key: "fal_wan21",
+    label: "fal.ai Wan2.1",
+    category: "premium",
+    description: "Managed Wan2.1 text-to-video inference on fal.ai cloud GPUs — same model as local ComfyUI but renders in 2-4 minutes with no hardware required.",
+    bestFor: ["Cinematic shots", "B-roll", "Fast Wan2.1 renders without local GPU"],
+    strengths: ["Same Wan2.1 quality as local", "No GPU required", "2-4 min renders", "Negative prompt support", "Pay per generation"],
+    weaknesses: ["No reference image support", "Per-generation cost", "Max 10s clips"],
+    supportsReferenceImage: false,
+    supportsPresenterMode: false,
+    supportsCinematicMode: true,
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    maxDurationSeconds: 10,
+    templates: [
+      { id: "cinematic_fal", name: "Cinematic Scene", description: "Full-quality Wan2.1 cinematic render on fal.ai cloud GPU — fast, no local hardware needed" },
+    ],
+  },
+  {
     key: "local_wan",
     label: "Local WAN (ComfyUI)",
     category: "local",
@@ -141,6 +158,7 @@ function getEngineStatus(key: string): EngineStatus {
     case "openai_sora":  return config.OPENAI_API_KEY                                                     ? "configured" : "not_configured";
     case "google_veo":   return (config.GOOGLE_VERTEX_PROJECT && config.GOOGLE_APPLICATION_CREDENTIALS)  ? "configured" : "not_configured";
     case "kling_video":  return config.KLING_API_KEY                                                      ? "configured" : "not_configured";
+    case "fal_wan21":    return config.FAL_API_KEY                                                        ? "configured" : "not_configured";
     case "local_wan":    return "local";
     default:             return "unavailable";
   }

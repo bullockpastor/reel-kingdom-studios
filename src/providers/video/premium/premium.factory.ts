@@ -4,6 +4,7 @@ import { OpenAISoraProvider } from "./openai-sora.provider.js";
 import { RunwayGen4Provider } from "./runway-gen4.provider.js";
 import { KlingVideoProvider } from "./kling-video.provider.js";
 import { GoogleVeoProvider } from "./google-veo.provider.js";
+import { FalWan21Provider } from "./fal-wan21.provider.js";
 import { config } from "../../../config.js";
 
 const providerCache = new Map<string, IPremiumVideoProvider>();
@@ -63,10 +64,17 @@ export function getPremiumVideoProvider(providerKey?: string): IPremiumVideoProv
       );
       break;
     }
+    case "fal_wan21": {
+      if (!config.FAL_API_KEY) {
+        throw new Error("FAL_API_KEY is required for the fal_wan21 provider.");
+      }
+      provider = new FalWan21Provider(config.FAL_API_KEY);
+      break;
+    }
     default: {
       throw new Error(
         `Unknown premium provider: "${key}". ` +
-          "Valid options: openai_sora | runway_gen4 | kling_video | google_veo"
+          "Valid options: openai_sora | runway_gen4 | kling_video | google_veo | fal_wan21"
       );
     }
   }

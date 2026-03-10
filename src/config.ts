@@ -27,7 +27,7 @@ const configSchema = z.object({
   OLLAMA_MODEL: z.string().default("llama3.2"),
 
   PREMIUM_VIDEO_PROVIDER: z
-    .enum(["openai_sora", "runway_gen4", "kling_video", "google_veo"])
+    .enum(["openai_sora", "runway_gen4", "kling_video", "google_veo", "fal_wan21"])
     .optional()
     .or(z.literal(""))
     .transform((v) => v || undefined),
@@ -61,6 +61,7 @@ const configSchema = z.object({
   VISUAL_QC_MODEL: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),
+  FAL_API_KEY: z.string().optional(),
   PREMIUM_POLL_TIMEOUT_MS: z.coerce.number().default(600_000),
 
   // Audio (TTS, music)
