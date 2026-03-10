@@ -24,6 +24,7 @@ const configSchema = z.object({
   STORYBOARD_LLM_PROVIDER: z.enum(["ollama", "claude", "gemini"]).default("ollama"),
   OLLAMA_URL: z.string().default("http://127.0.0.1:11434"),
   OLLAMA_MODEL: z.string().default("llama3.2"),
+  OLLAMA_API_KEY: z.string().optional(),
 
   PREMIUM_VIDEO_PROVIDER: z
     .enum(["openai_sora", "runway_gen4", "kling_video", "google_veo"])

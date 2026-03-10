@@ -43,9 +43,14 @@ export class OllamaProvider implements LLMProvider, AgentChatProvider {
       body.format = options.outputSchema;
     }
 
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (config.OLLAMA_API_KEY) {
+      headers["Authorization"] = `Bearer ${config.OLLAMA_API_KEY}`;
+    }
+
     const response = await fetch(`${config.OLLAMA_URL}/api/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(body),
     });
 
@@ -73,9 +78,14 @@ export class OllamaProvider implements LLMProvider, AgentChatProvider {
 
       logger.info({ attempt: attempt + 1, model: config.OLLAMA_MODEL }, "Calling Ollama for storyboard");
 
+      const storyboardHeaders: Record<string, string> = { "Content-Type": "application/json" };
+      if (config.OLLAMA_API_KEY) {
+        storyboardHeaders["Authorization"] = `Bearer ${config.OLLAMA_API_KEY}`;
+      }
+
       const response = await fetch(`${config.OLLAMA_URL}/api/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: storyboardHeaders,
         body: JSON.stringify({
           model: config.OLLAMA_MODEL,
           messages: [
