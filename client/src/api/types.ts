@@ -72,6 +72,15 @@ export interface RenderJob {
   shot?: { shotIndex: number; projectId: string; prompt: string };
 }
 
+export interface PresenterTemplate {
+  id: string;
+  label: string;
+  category: "church" | "studio" | "office" | "outdoor";
+  description: string;
+  setPrompt: string;
+  accentColor: string;
+}
+
 export interface Presenter {
   id: string;
   name: string;

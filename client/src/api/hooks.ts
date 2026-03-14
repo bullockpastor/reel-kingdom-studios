@@ -113,6 +113,10 @@ export function useUpdateShot() {
 
 // ─── Presenter hooks ──────────────────────────────────────────────────────
 
+export function usePresenterTemplates() {
+  return useQuery({ queryKey: ["presenterTemplates"], queryFn: api.listPresenterTemplates, staleTime: Infinity });
+}
+
 export function usePresenters() {
   return useQuery({ queryKey: ["presenters"], queryFn: api.listPresenters });
 }

@@ -9,6 +9,7 @@ import {
 } from "../agents/index.js";
 import type { AgentRunResult } from "../agents/index.js";
 import { queueRender } from "./render.service.js";
+import { getTemplate, TEMPLATE_CATALOG_FOR_AGENT } from "../data/presenter-templates.js";
 
 /**
  * Derive a stable 32-bit seed from a project ID string.
@@ -117,6 +118,7 @@ export async function generatePresenterPipeline(
     directedScript: directedOutput,
     presenterDescription: presenter.description,
     templatePreference: templatePreference ?? presenter.defaultTemplateId ?? null,
+    availableTemplates: TEMPLATE_CATALOG_FOR_AGENT,
   });
 
   const performanceResult = await runAgent(performanceDirectorAgent, performanceInput);
@@ -147,11 +149,17 @@ export async function generatePresenterPipeline(
       // Clamp to Runway Gen4 max; the provider will further snap to 5s or 10s
       const clampedDuration = Math.min(segment?.beatTimingSeconds ?? 5.0, 10.0);
 
+      // Enrich the visual prompt with the template's authoritative set description
+      const template = getTemplate(shot.templateId);
+      const enrichedPrompt = template
+        ? `${shot.visualPrompt}. Background and environment: ${template.setPrompt}`
+        : shot.visualPrompt;
+
       return db.shot.create({
         data: {
           projectId: project.id,
           shotIndex: shot.segmentIndex,
-          prompt: shot.visualPrompt,
+          prompt: enrichedPrompt,
           negativePrompt: "blurry, low quality, watermark, text overlay, deformed, inconsistent identity, flickering",
           durationSeconds: clampedDuration,
           cameraMotion: shot.cameraFraming,

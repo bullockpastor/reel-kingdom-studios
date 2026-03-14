@@ -6,6 +6,7 @@ import { db } from "../db.js";
 import { config } from "../config.js";
 import { ensureProjectDirs, ensurePresenterDirs } from "../storage/studio-root.js";
 import { generatePresenterPipeline, queuePresenterRenders } from "../services/presenter.service.js";
+import { PRESENTER_TEMPLATES } from "../data/presenter-templates.js";
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const ALLOWED_IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
@@ -162,6 +163,13 @@ export async function presenterRoutes(app: FastifyInstance) {
     };
   });
 
+  // ─── Template Catalog ─────────────────────────────────────────────────────
+
+  // GET /presenter/templates — Return the full template catalog
+  app.get("/templates", async () => {
+    return PRESENTER_TEMPLATES;
+  });
+
   // ─── Presenter Projects ───────────────────────────────────────────────────
 
   // POST /presenter/projects — Create project + run Script Director + Performance Director
@@ -173,6 +181,7 @@ export async function presenterRoutes(app: FastifyInstance) {
       videoType?: string;
       targetDurationSeconds?: number;
       provider?: string;
+      templatePreference?: string;
     };
 
     if (!body.rawScript?.trim()) {
@@ -212,6 +221,7 @@ export async function presenterRoutes(app: FastifyInstance) {
           videoType: body.videoType,
           targetDurationSeconds: body.targetDurationSeconds,
           selectedProvider: body.provider?.trim() || undefined,
+          templatePreference: body.templatePreference?.trim() || undefined,
         }
       );
 

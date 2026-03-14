@@ -1,10 +1,67 @@
 import { useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { usePresenters, useCreatePresenter, useCreatePresenterProject, useUpdatePresenter, useUploadPresenterImage } from "@/api/hooks";
+import { usePresenters, usePresenterTemplates, useCreatePresenter, useCreatePresenterProject, useUpdatePresenter, useUploadPresenterImage } from "@/api/hooks";
 import { StatusBadge } from "@/components/project/StatusBadge";
 import { timeAgo } from "@/lib/utils";
-import { Plus, Loader2, Video, User, ChevronDown, ChevronUp, Pencil, Check, X, ImagePlus } from "lucide-react";
-import type { Presenter } from "@/api/types";
+import { Plus, Loader2, Video, User, ChevronDown, ChevronUp, Pencil, Check, X, ImagePlus, CheckCircle2 } from "lucide-react";
+import type { Presenter, PresenterTemplate } from "@/api/types";
+
+const CATEGORY_LABELS: Record<string, string> = {
+  church: "Church",
+  studio: "Studio",
+  office: "Office",
+  outdoor: "Outdoor",
+};
+
+function TemplateSelector({
+  templates,
+  value,
+  onChange,
+}: {
+  templates: PresenterTemplate[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const categories = ["church", "studio", "office", "outdoor"] as const;
+
+  return (
+    <div className="space-y-3">
+      {categories.map((cat) => {
+        const group = templates.filter((t) => t.category === cat);
+        if (group.length === 0) return null;
+        return (
+          <div key={cat}>
+            <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-1.5">
+              {CATEGORY_LABELS[cat]}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {group.map((t) => {
+                const selected = value === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => onChange(selected ? "" : t.id)}
+                    title={t.description}
+                    className={`relative flex items-center gap-2 px-3 py-2 rounded-lg border text-left text-xs transition-colors ${
+                      selected
+                        ? "border-accent bg-accent/10 text-text-primary"
+                        : "border-border bg-surface hover:border-accent/50 text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${t.accentColor}`} />
+                    <span className="font-medium">{t.label}</span>
+                    {selected && <CheckCircle2 size={12} className="text-accent ml-0.5" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 const PROVIDERS = ["runway_gen4", "openai_sora", "google_veo", "kling_video"];
 const VIDEO_TYPES = ["sermon", "devotional", "announcement", "social"];
@@ -13,6 +70,7 @@ export function Presenters() {
   const navigate = useNavigate();
   const location = useLocation();
   const { data: presenters, isLoading } = usePresenters();
+  const { data: templates = [] } = usePresenterTemplates();
   const createPresenter = useCreatePresenter();
   const createProject = useCreatePresenterProject();
   const uploadImage = useUploadPresenterImage();
@@ -44,6 +102,7 @@ export function Presenters() {
     videoType: "sermon",
     targetDurationSeconds: "",
     provider: "runway_gen4",
+    templatePreference: "",
   });
 
   const [projectError, setProjectError] = useState<string | null>(null);
@@ -94,6 +153,7 @@ export function Presenters() {
           ? Number(projectForm.targetDurationSeconds)
           : undefined,
         provider: projectForm.provider,
+        templatePreference: projectForm.templatePreference || undefined,
       });
       navigate(`/presenter/projects/${result.project.id}`);
     } catch (err) {
@@ -205,17 +265,15 @@ export function Presenters() {
               />
             </div>
 
+            <div>
+              <label className="block text-xs font-medium text-text-muted mb-1">Default Template (optional)</label>
+              <TemplateSelector
+                templates={templates}
+                value={presenterForm.defaultTemplateId}
+                onChange={(id) => setPresenterForm((f) => ({ ...f, defaultTemplateId: id }))}
+              />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-text-muted mb-1">Default Template ID (optional)</label>
-                <input
-                  type="text"
-                  placeholder="dark_wood_pulpit"
-                  value={presenterForm.defaultTemplateId}
-                  onChange={(e) => setPresenterForm((f) => ({ ...f, defaultTemplateId: e.target.value }))}
-                  className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent"
-                />
-              </div>
               <div>
                 <label className="block text-xs font-medium text-text-muted mb-1">Voice ID (Phase 2 TTS)</label>
                 <input
@@ -315,6 +373,19 @@ export function Presenters() {
                 </select>
               </div>
             </div>
+            {templates.length > 0 && (
+              <div>
+                <label className="block text-xs font-medium text-text-muted mb-1">
+                  Template Override
+                  <span className="ml-1 text-text-muted font-normal">(optional — defaults to presenter's template)</span>
+                </label>
+                <TemplateSelector
+                  templates={templates}
+                  value={projectForm.templatePreference}
+                  onChange={(id) => setProjectForm((f) => ({ ...f, templatePreference: id }))}
+                />
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-text-muted mb-1">Title (optional)</label>
               <input
@@ -374,8 +445,8 @@ export function Presenters() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {presenters.map((p) => (
-              <PresenterCard key={p.id} presenter={p} onNewProject={() => {
-                setProjectForm((f) => ({ ...f, presenterId: p.id, provider: p.defaultProvider }));
+              <PresenterCard key={p.id} presenter={p} templates={templates} onNewProject={() => {
+                setProjectForm((f) => ({ ...f, presenterId: p.id, provider: p.defaultProvider, templatePreference: p.defaultTemplateId ?? "" }));
                 setShowNewProject(true);
                 setShowNewPresenter(false);
               }} />
@@ -387,7 +458,7 @@ export function Presenters() {
   );
 }
 
-function PresenterCard({ presenter, onNewProject }: { presenter: Presenter; onNewProject: () => void }) {
+function PresenterCard({ presenter, templates, onNewProject }: { presenter: Presenter; templates: PresenterTemplate[]; onNewProject: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const updatePresenter = useUpdatePresenter();
@@ -518,13 +589,11 @@ function PresenterCard({ presenter, onNewProject }: { presenter: Presenter; onNe
           />
         </div>
         <div>
-          <label className="block text-xs text-text-muted mb-1">Default Template ID</label>
-          <input
-            type="text"
-            placeholder="dark_wood_pulpit"
+          <label className="block text-xs text-text-muted mb-1">Default Template</label>
+          <TemplateSelector
+            templates={templates}
             value={editForm.defaultTemplateId}
-            onChange={(e) => setEditForm((f) => ({ ...f, defaultTemplateId: e.target.value }))}
-            className="w-full px-2 py-1.5 bg-surface border border-border rounded text-sm text-text-primary focus:outline-none focus:border-accent"
+            onChange={(id) => setEditForm((f) => ({ ...f, defaultTemplateId: id }))}
           />
         </div>
         <div className="flex gap-2">
@@ -602,9 +671,17 @@ function PresenterCard({ presenter, onNewProject }: { presenter: Presenter; onNe
           <p className="text-xs text-text-secondary mt-2 leading-relaxed">{presenter.description}</p>
         )}
       </div>
-      {presenter.defaultTemplateId && (
-        <p className="text-xs text-text-muted">Template: <span className="text-text-secondary font-mono">{presenter.defaultTemplateId}</span></p>
-      )}
+      {presenter.defaultTemplateId && (() => {
+        const tpl = templates.find((t) => t.id === presenter.defaultTemplateId);
+        return (
+          <div className="flex items-center gap-1.5">
+            {tpl && <span className={`w-2 h-2 rounded-full flex-shrink-0 ${tpl.accentColor}`} />}
+            <p className="text-xs text-text-muted">
+              Template: <span className="text-text-secondary">{tpl?.label ?? presenter.defaultTemplateId}</span>
+            </p>
+          </div>
+        );
+      })()}
     </div>
   );
 }

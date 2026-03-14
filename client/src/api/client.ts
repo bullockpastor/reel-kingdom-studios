@@ -1,4 +1,4 @@
-import type { Project, Shot, HealthResponse, QueueStatus, Presenter, PresenterScript, Engine, ComparisonResult, RouteTableEntry, ResolvedRoute, RunPodStatus } from "./types";
+import type { Project, Shot, HealthResponse, QueueStatus, Presenter, PresenterScript, PresenterTemplate, Engine, ComparisonResult, RouteTableEntry, ResolvedRoute, RunPodStatus } from "./types";
 
 const BASE = "";
 
@@ -81,6 +81,9 @@ export const api = {
   // Asset URL helper
   assetUrl: (relativePath: string) => `/assets/${relativePath}`,
 
+  // Presenter template catalog
+  listPresenterTemplates: () => request<PresenterTemplate[]>("/presenter/templates"),
+
   // Presenter profiles
   listPresenters: () => request<Presenter[]>("/presenter/profiles"),
   createPresenter: (data: {
@@ -112,6 +115,7 @@ export const api = {
     videoType?: string;
     targetDurationSeconds?: number;
     provider?: string;
+    templatePreference?: string;
   }) =>
     request<{ project: Project; presenterScript: PresenterScript; shots: Shot[]; agentResults: { agentName: string; durationMs: number }[] }>(
       "/presenter/projects",
