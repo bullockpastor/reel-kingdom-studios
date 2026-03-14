@@ -142,6 +142,15 @@ export function useUpdatePresenter() {
   });
 }
 
+export function useUploadPresenterImage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, file }: { id: string; file: File }) =>
+      api.uploadPresenterImage(id, file),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["presenters"] }),
+  });
+}
+
 export function useCreatePresenterProject() {
   const qc = useQueryClient();
   return useMutation({
@@ -168,6 +177,32 @@ export function useProducePresenterProject() {
       qc.invalidateQueries({ queryKey: ["presenterProject", id] });
       qc.invalidateQueries({ queryKey: ["queue"] });
     },
+  });
+}
+
+// ─── RunPod hooks ─────────────────────────────────────────────────────────────
+
+export function useRunPodStatus() {
+  return useQuery({
+    queryKey: ["runpod"],
+    queryFn: api.runpodStatus,
+    refetchInterval: 10000,
+  });
+}
+
+export function useRunPodStart() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.runpodStart,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["runpod"] }),
+  });
+}
+
+export function useRunPodStop() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (podId?: string) => api.runpodStop(podId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["runpod"] }),
   });
 }
 

@@ -5,7 +5,7 @@ export interface RenderJobData {
   shotId: string;
   renderJobId: string;
   projectId: string;
-  engine: "comfyui" | "premium";
+  engine: "comfyui" | "runpod_wan" | "premium";
   prompt: string;
   negativePrompt: string;
   durationSeconds: number;

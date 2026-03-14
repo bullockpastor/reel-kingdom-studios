@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { usePresenters, useCreatePresenter, useCreatePresenterProject, useUpdatePresenter } from "@/api/hooks";
+import { usePresenters, useCreatePresenter, useCreatePresenterProject, useUpdatePresenter, useUploadPresenterImage } from "@/api/hooks";
 import { StatusBadge } from "@/components/project/StatusBadge";
 import { timeAgo } from "@/lib/utils";
-import { Plus, Loader2, Video, User, ChevronDown, ChevronUp, Pencil, Check, X } from "lucide-react";
+import { Plus, Loader2, Video, User, ChevronDown, ChevronUp, Pencil, Check, X, ImagePlus } from "lucide-react";
 import type { Presenter } from "@/api/types";
 
 const PROVIDERS = ["runway_gen4", "openai_sora", "google_veo", "kling_video"];
@@ -15,6 +15,7 @@ export function Presenters() {
   const { data: presenters, isLoading } = usePresenters();
   const createPresenter = useCreatePresenter();
   const createProject = useCreatePresenterProject();
+  const uploadImage = useUploadPresenterImage();
 
   // Auto-open the new project panel when arriving from the Create Project launcher
   const locationState = location.state as { openNewProject?: boolean } | null;
@@ -31,6 +32,9 @@ export function Presenters() {
     defaultTemplateId: "",
     voiceId: "",
   });
+  const [presenterImageFile, setPresenterImageFile] = useState<File | null>(null);
+  const [presenterImagePreview, setPresenterImagePreview] = useState<string | null>(null);
+  const createImageInputRef = useRef<HTMLInputElement>(null);
 
   // New project form state
   const [projectForm, setProjectForm] = useState({
@@ -47,15 +51,31 @@ export function Presenters() {
   async function handleCreatePresenter(e: React.FormEvent) {
     e.preventDefault();
     if (!presenterForm.name.trim() || !presenterForm.description.trim()) return;
-    await createPresenter.mutateAsync({
+    const created = await createPresenter.mutateAsync({
       name: presenterForm.name.trim(),
       description: presenterForm.description.trim(),
       defaultProvider: presenterForm.defaultProvider,
       defaultTemplateId: presenterForm.defaultTemplateId.trim() || undefined,
       voiceId: presenterForm.voiceId.trim() || undefined,
     });
+    if (presenterImageFile) {
+      await uploadImage.mutateAsync({ id: created.id, file: presenterImageFile });
+    }
     setPresenterForm({ name: "", description: "", defaultProvider: "runway_gen4", defaultTemplateId: "", voiceId: "" });
+    setPresenterImageFile(null);
+    setPresenterImagePreview(null);
     setShowNewPresenter(false);
+  }
+
+  function handleCreateImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setPresenterImageFile(file);
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setPresenterImagePreview(url);
+    } else {
+      setPresenterImagePreview(null);
+    }
   }
 
   async function handleCreateProject(e: React.FormEvent) {
@@ -145,6 +165,46 @@ export function Presenters() {
                 className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent resize-none"
               />
             </div>
+            {/* Reference image */}
+            <div>
+              <label className="block text-xs font-medium text-text-muted mb-1">Reference Image (optional)</label>
+              <div className="flex items-center gap-3">
+                {presenterImagePreview ? (
+                  <img src={presenterImagePreview} alt="preview" className="w-16 h-16 rounded-lg object-cover border border-border flex-shrink-0" />
+                ) : (
+                  <div className="w-16 h-16 rounded-lg border border-dashed border-border flex items-center justify-center flex-shrink-0">
+                    <ImagePlus size={20} className="text-text-muted" />
+                  </div>
+                )}
+                <div className="flex-1">
+                  <button
+                    type="button"
+                    onClick={() => createImageInputRef.current?.click()}
+                    className="px-3 py-1.5 text-xs border border-border rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
+                  >
+                    {presenterImageFile ? presenterImageFile.name : "Choose image…"}
+                  </button>
+                  {presenterImageFile && (
+                    <button
+                      type="button"
+                      onClick={() => { setPresenterImageFile(null); setPresenterImagePreview(null); if (createImageInputRef.current) createImageInputRef.current.value = ""; }}
+                      className="ml-2 text-xs text-text-muted hover:text-text-primary"
+                    >
+                      Remove
+                    </button>
+                  )}
+                  <p className="text-[11px] text-text-muted mt-1">Used by Runway for identity anchoring. JPEG, PNG, or WebP, max 20 MB.</p>
+                </div>
+              </div>
+              <input
+                ref={createImageInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handleCreateImageChange}
+              />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-text-muted mb-1">Default Template ID (optional)</label>
@@ -170,11 +230,11 @@ export function Presenters() {
             <div className="flex gap-3">
               <button
                 type="submit"
-                disabled={createPresenter.isPending}
+                disabled={createPresenter.isPending || uploadImage.isPending}
                 className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
               >
-                {createPresenter.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                Create Presenter
+                {(createPresenter.isPending || uploadImage.isPending) ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                {uploadImage.isPending ? "Uploading…" : "Create Presenter"}
               </button>
               <button
                 type="button"
@@ -331,6 +391,11 @@ function PresenterCard({ presenter, onNewProject }: { presenter: Presenter; onNe
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const updatePresenter = useUpdatePresenter();
+  const uploadImage = useUploadPresenterImage();
+  const editImageInputRef = useRef<HTMLInputElement>(null);
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
+
   const [editForm, setEditForm] = useState({
     name: presenter.name,
     description: presenter.description,
@@ -338,6 +403,12 @@ function PresenterCard({ presenter, onNewProject }: { presenter: Presenter; onNe
     defaultProvider: presenter.defaultProvider,
     defaultTemplateId: presenter.defaultTemplateId ?? "",
   });
+
+  function handleEditImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setEditImageFile(file);
+    setEditImagePreview(file ? URL.createObjectURL(file) : null);
+  }
 
   async function handleSave() {
     await updatePresenter.mutateAsync({
@@ -350,7 +421,12 @@ function PresenterCard({ presenter, onNewProject }: { presenter: Presenter; onNe
         defaultTemplateId: editForm.defaultTemplateId.trim() || undefined,
       },
     });
+    if (editImageFile) {
+      await uploadImage.mutateAsync({ id: presenter.id, file: editImageFile });
+    }
     setEditing(false);
+    setEditImageFile(null);
+    setEditImagePreview(null);
   }
 
   if (editing) {
@@ -394,6 +470,45 @@ function PresenterCard({ presenter, onNewProject }: { presenter: Presenter; onNe
           />
         </div>
         <div>
+          <label className="block text-xs text-text-muted mb-1">Reference Image</label>
+          <div className="flex items-center gap-2">
+            {(editImagePreview ?? presenter.referenceImageUrl) ? (
+              <img
+                src={editImagePreview ?? presenter.referenceImageUrl!}
+                alt="reference"
+                className="w-12 h-12 rounded object-cover border border-border flex-shrink-0"
+              />
+            ) : (
+              <div className="w-12 h-12 rounded border border-dashed border-border flex items-center justify-center flex-shrink-0">
+                <ImagePlus size={16} className="text-text-muted" />
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => editImageInputRef.current?.click()}
+              className="px-2 py-1 text-xs border border-border rounded text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
+            >
+              {editImageFile ? editImageFile.name : presenter.referenceImageUrl ? "Replace" : "Choose…"}
+            </button>
+            {editImageFile && (
+              <button
+                type="button"
+                onClick={() => { setEditImageFile(null); setEditImagePreview(null); if (editImageInputRef.current) editImageInputRef.current.value = ""; }}
+                className="text-xs text-text-muted hover:text-text-primary"
+              >
+                <X size={12} />
+              </button>
+            )}
+            <input
+              ref={editImageInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={handleEditImageChange}
+            />
+          </div>
+        </div>
+        <div>
           <label className="block text-xs text-text-muted mb-1">Description</label>
           <textarea
             rows={3}
@@ -415,11 +530,11 @@ function PresenterCard({ presenter, onNewProject }: { presenter: Presenter; onNe
         <div className="flex gap-2">
           <button
             onClick={handleSave}
-            disabled={updatePresenter.isPending}
+            disabled={updatePresenter.isPending || uploadImage.isPending}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white rounded text-xs font-medium transition-colors"
           >
-            {updatePresenter.isPending ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-            Save
+            {(updatePresenter.isPending || uploadImage.isPending) ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+            {uploadImage.isPending ? "Uploading…" : "Save"}
           </button>
           <button
             onClick={() => setEditing(false)}
@@ -435,6 +550,18 @@ function PresenterCard({ presenter, onNewProject }: { presenter: Presenter; onNe
   return (
     <div className="bg-surface-elevated border border-border rounded-xl p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
+        {/* Reference image thumbnail */}
+        {presenter.referenceImageUrl ? (
+          <img
+            src={presenter.referenceImageUrl}
+            alt={presenter.name}
+            className="w-12 h-12 rounded-lg object-cover border border-border flex-shrink-0"
+          />
+        ) : (
+          <div className="w-12 h-12 rounded-lg border border-dashed border-border flex items-center justify-center flex-shrink-0">
+            <User size={18} className="text-text-muted" />
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-text-primary truncate">{presenter.name}</h3>

@@ -8,8 +8,8 @@ export class ComfyUIRenderer implements VideoRenderer {
   readonly engine = "comfyui";
   private client: ComfyUIClient;
 
-  constructor() {
-    this.client = new ComfyUIClient();
+  constructor(baseUrl?: string) {
+    this.client = new ComfyUIClient(baseUrl);
   }
 
   async render(request: RenderRequest): Promise<RenderResult> {

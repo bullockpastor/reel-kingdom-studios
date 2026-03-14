@@ -9,7 +9,7 @@ import { config } from "../../../config.js";
 import { logger } from "../../../utils/logger.js";
 
 const FAL_BASE = "https://queue.fal.run";
-const FAL_MODEL = "fal-ai/wan/v2.1/t2v";
+const FAL_MODEL = "fal-ai/wan/v2.2-a14b/text-to-video";
 const POLL_INTERVAL_MS = 5_000;
 
 type FalStatus = "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
@@ -17,6 +17,9 @@ type FalStatus = "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
 interface FalQueueResponse {
   request_id: string;
   status: FalStatus;
+  status_url: string;
+  response_url: string;
+  cancel_url?: string;
 }
 
 interface FalStatusResponse {
@@ -29,13 +32,13 @@ interface FalResultResponse {
 }
 
 /**
- * Map pixel dimensions to fal.ai Wan2.1 resolution string.
- * fal.ai accepts "480p" | "720p" | "1080p".
+ * Map pixel dimensions to fal.ai Wan2.2 resolution string.
+ * fal.ai accepts "480p" | "580p" | "720p".
  */
 function toFalResolution(width: number, height: number): string {
   const long = Math.max(width, height);
-  if (long >= 900) return "1080p";
-  if (long >= 600) return "720p";
+  if (long >= 700) return "720p";
+  if (long >= 550) return "580p";
   return "480p";
 }
 
@@ -71,10 +74,16 @@ export class FalWan21Provider implements IPremiumVideoProvider {
     this.apiKey = apiKey;
   }
 
-  private headers() {
+  private postHeaders() {
     return {
       Authorization: `Key ${this.apiKey}`,
       "Content-Type": "application/json",
+    };
+  }
+
+  private getHeaders() {
+    return {
+      Authorization: `Key ${this.apiKey}`,
     };
   }
 
@@ -82,7 +91,8 @@ export class FalWan21Provider implements IPremiumVideoProvider {
     const startMs = Date.now();
     const resolution = toFalResolution(req.width, req.height);
     const aspectRatio = toFalAspectRatio(req.width, req.height);
-    const numFrames = Math.round(req.durationSeconds * req.fps);
+    // fal.ai Wan2.1 minimum is 81 frames (5s @ 16fps); clamp up
+    const numFrames = Math.max(81, Math.round(req.durationSeconds * req.fps));
 
     const body: Record<string, unknown> = {
       prompt: req.prompt,
@@ -98,7 +108,7 @@ export class FalWan21Provider implements IPremiumVideoProvider {
     // Submit job
     const submitResp = await fetch(`${FAL_BASE}/${FAL_MODEL}`, {
       method: "POST",
-      headers: this.headers(),
+      headers: this.postHeaders(),
       body: JSON.stringify(body),
     });
 
@@ -114,10 +124,12 @@ export class FalWan21Provider implements IPremiumVideoProvider {
 
     const queued = (await submitResp.json()) as FalQueueResponse;
     const requestId = queued.request_id;
+    const statusUrl = queued.status_url;
+    const responseUrl = queued.response_url;
 
     logger.info(
       { shotId: req.shotId, requestId, resolution, aspectRatio, numFrames },
-      "fal.ai Wan2.1 job submitted — polling"
+      "fal.ai Wan2.2 job submitted — polling"
     );
 
     // Poll for completion
@@ -126,10 +138,7 @@ export class FalWan21Provider implements IPremiumVideoProvider {
     while (Date.now() < deadline) {
       await sleep(POLL_INTERVAL_MS);
 
-      const statusResp = await fetch(
-        `${FAL_BASE}/${FAL_MODEL}/requests/${requestId}/status`,
-        { headers: this.headers() }
-      );
+      const statusResp = await fetch(statusUrl, { headers: this.getHeaders() });
 
       if (!statusResp.ok) {
         return {
@@ -144,11 +153,8 @@ export class FalWan21Provider implements IPremiumVideoProvider {
       const status = (await statusResp.json()) as FalStatusResponse;
 
       if (status.status === "COMPLETED") {
-        // Fetch result
-        const resultResp = await fetch(
-          `${FAL_BASE}/${FAL_MODEL}/requests/${requestId}`,
-          { headers: this.headers() }
-        );
+        // Fetch result using the response_url from the queue submission
+        const resultResp = await fetch(responseUrl, { headers: this.getHeaders() });
 
         if (!resultResp.ok) {
           return {

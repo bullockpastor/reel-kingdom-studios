@@ -1,8 +1,14 @@
 import type { FastifyInstance } from "fastify";
+import { createWriteStream } from "node:fs";
+import { pipeline } from "node:stream/promises";
+import { extname } from "node:path";
 import { db } from "../db.js";
 import { config } from "../config.js";
-import { ensureProjectDirs } from "../storage/studio-root.js";
+import { ensureProjectDirs, ensurePresenterDirs } from "../storage/studio-root.js";
 import { generatePresenterPipeline, queuePresenterRenders } from "../services/presenter.service.js";
+
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const ALLOWED_IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 
 function toAssetUrl(absolutePath: string | null): string | null {
   if (!absolutePath) return null;
@@ -94,6 +100,45 @@ export async function presenterRoutes(app: FastifyInstance) {
         ...(body.defaultProvider !== undefined && { defaultProvider: body.defaultProvider }),
         ...(body.defaultTemplateId !== undefined && { defaultTemplateId: body.defaultTemplateId }),
       },
+    });
+
+    return reply.send({
+      ...updated,
+      referenceImageUrl: toAssetUrl(updated.referenceImagePath),
+    });
+  });
+
+  // POST /presenter/profiles/:id/reference-image — Upload reference image
+  app.post("/profiles/:id/reference-image", async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    const existing = await db.presenter.findUnique({ where: { id } });
+    if (!existing) {
+      return reply.status(404).send({ error: "Presenter not found" });
+    }
+
+    const part = await request.file();
+    if (!part) {
+      return reply.status(400).send({ error: "No file uploaded" });
+    }
+
+    if (!ALLOWED_IMAGE_TYPES.has(part.mimetype)) {
+      return reply.status(400).send({ error: "Only JPEG, PNG, and WebP images are allowed" });
+    }
+
+    const ext = extname(part.filename).toLowerCase() || ".jpg";
+    if (!ALLOWED_IMAGE_EXTS.has(ext)) {
+      return reply.status(400).send({ error: "Invalid file extension" });
+    }
+
+    const { referenceDir } = ensurePresenterDirs(id);
+    const savePath = `${referenceDir}/reference${ext}`;
+
+    await pipeline(part.file, createWriteStream(savePath));
+
+    const updated = await db.presenter.update({
+      where: { id },
+      data: { referenceImagePath: savePath },
     });
 
     return reply.send({

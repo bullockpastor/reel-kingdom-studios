@@ -130,6 +130,23 @@ const ENGINE_CATALOG: EngineMeta[] = [
     ],
   },
   {
+    key: "runpod_wan",
+    label: "RunPod WAN (Cloud GPU)",
+    category: "local",
+    description: "ComfyUI running on a RunPod RTX 4090 — same Wan2.1 workflow as local, but on cloud hardware. Start/stop from the Engines dashboard.",
+    bestFor: ["Fast local-quality renders", "Offline Mac renders", "Cloud GPU on demand"],
+    strengths: ["RTX 4090 speed (~2 min)", "Same Wan2.1 quality as local", "Start/stop to control costs", "No per-generation API cost"],
+    weaknesses: ["Requires RunPod account", "~$0.74/hr when running", "Pod startup takes ~2-3 min", "Models re-download without network volume"],
+    supportsReferenceImage: false,
+    supportsPresenterMode: false,
+    supportsCinematicMode: true,
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    maxDurationSeconds: 10,
+    templates: [
+      { id: "runpod_cinematic", name: "Cloud Cinematic Scene", description: "Full-quality Wan2.1 render on RunPod RTX 4090 — same workflow as local ComfyUI, GPU-accelerated" },
+    ],
+  },
+  {
     key: "local_wan",
     label: "Local WAN (ComfyUI)",
     category: "local",
@@ -159,6 +176,7 @@ function getEngineStatus(key: string): EngineStatus {
     case "google_veo":   return (config.GOOGLE_VERTEX_PROJECT && config.GOOGLE_APPLICATION_CREDENTIALS)  ? "configured" : "not_configured";
     case "kling_video":  return config.KLING_API_KEY                                                      ? "configured" : "not_configured";
     case "fal_wan21":    return config.FAL_API_KEY                                                        ? "configured" : "not_configured";
+    case "runpod_wan":   return config.RUNPOD_API_KEY                                                     ? "configured" : "not_configured";
     case "local_wan":    return "local";
     default:             return "unavailable";
   }

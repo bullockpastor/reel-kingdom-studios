@@ -69,6 +69,12 @@ const configSchema = z.object({
   ELEVENLABS_VOICE_ID: z.string().default("21m00Tcm4TlvDq8ikWAM"), // Rachel
   AUDIO_LIBRARY_PATH: z.string().optional(),
 
+  // RunPod cloud GPU
+  RUNPOD_API_KEY: z.string().optional(),
+  RUNPOD_TEMPLATE_ID: z.string().default("runpod/comfyui:latest"),
+  RUNPOD_GPU_TYPE_ID: z.string().default("NVIDIA GeForce RTX 4090"),
+  RUNPOD_NETWORK_VOLUME_ID: z.string().optional(),
+
   // Cost caps (optional, reject/warn premium when exceeded)
   PREMIUM_MONTHLY_CAP: z.coerce.number().optional(),
   PREMIUM_PROJECT_CAP: z.coerce.number().optional(),

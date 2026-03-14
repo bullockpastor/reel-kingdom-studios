@@ -33,6 +33,12 @@ export function projectOutputDir(projectId: string): string {
   return join(config.STUDIO_ROOT, projectId, "output");
 }
 
+export function ensurePresenterDirs(presenterId: string): { referenceDir: string } {
+  const referenceDir = join(config.STUDIO_ROOT, "presenters", presenterId, "reference");
+  mkdirSync(referenceDir, { recursive: true });
+  return { referenceDir };
+}
+
 export function shotRenderDir(
   projectId: string,
   shotId: string,

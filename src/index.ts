@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
+import multipart from "@fastify/multipart";
 import { join } from "node:path";
 import { config, STUDIO_NAME, STUDIO_TAGLINE } from "./config.js";
 import { logger } from "./utils/logger.js";
@@ -14,12 +15,14 @@ import { presenterRoutes } from "./routes/presenter.js";
 import { engineRoutes } from "./routes/engines.js";
 import { costRoutes } from "./routes/costs.js";
 import { modelRouterRoutes } from "./routes/model-router.js";
+import { runpodRoutes } from "./routes/runpod.js";
 import "./queue/render.worker.js";
 import "./queue/assembly.worker.js";
 
 const app = Fastify({ logger: false });
 
 app.register(cors);
+app.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } }); // 20 MB max
 
 // Serve the React SPA from client/dist/
 app.register(fastifyStatic, {
@@ -60,6 +63,7 @@ app.register(presenterRoutes, { prefix: "/presenter" });
 app.register(engineRoutes,   { prefix: "/engines" });
 app.register(costRoutes,     { prefix: "/costs" });
 app.register(modelRouterRoutes, { prefix: "/model-router" });
+app.register(runpodRoutes,      { prefix: "/runpod" });
 
 // Global error handler
 app.setErrorHandler((error: Error, _request, reply) => {

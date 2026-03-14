@@ -1,13 +1,140 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useEngines, useSetEngineDefault } from "@/api/hooks";
+import { useEngines, useSetEngineDefault, useRunPodStatus, useRunPodStart, useRunPodStop } from "@/api/hooks";
 import type { Engine } from "@/api/types";
 import {
   Zap, Sparkles, Globe, FlaskConical, Cpu,
   ChevronDown, ChevronUp, X, CheckCircle2, Loader2,
-  GitCompare,
+  GitCompare, Server, Play, Square, AlertTriangle, Wifi,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+// ─── RunPod Pod Manager ───────────────────────────────────────────────────────
+
+function RunPodPanel() {
+  const { data: status, isLoading } = useRunPodStatus();
+  const start = useRunPodStart();
+  const stop = useRunPodStop();
+
+  const isRunning = status?.state === "running";
+  const isStopped = status?.state === "stopped";
+  const isNotConfigured = status?.state === "not_configured";
+
+  function formatUptime(seconds: number | null): string {
+    if (seconds === null) return "—";
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+  }
+
+  if (isNotConfigured) return null;
+
+  return (
+    <div className="bg-surface-elevated border border-border rounded-xl p-5">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "w-10 h-10 rounded-lg flex items-center justify-center border flex-shrink-0",
+            isRunning ? "bg-green-500/10 border-green-500/25" : "bg-zinc-500/10 border-zinc-500/25"
+          )}>
+            <Server size={18} className={isRunning ? "text-green-400" : "text-zinc-400"} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-text-primary">RunPod Cloud GPU</h3>
+              {isLoading ? (
+                <Loader2 size={12} className="animate-spin text-text-muted" />
+              ) : isRunning ? (
+                <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border bg-green-950/50 border-green-900/60 text-green-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                  Running
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border bg-zinc-900 border-zinc-800 text-zinc-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+                  Stopped
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-text-muted mt-0.5">
+              {status?.gpuTypeId} · {status?.templateId}
+            </p>
+          </div>
+        </div>
+
+        {/* Stats row (when running) */}
+        {isRunning && (
+          <div className="hidden sm:flex items-center gap-6 text-xs text-text-muted">
+            {status?.costPerHr != null && (
+              <div className="text-center">
+                <p className="text-text-primary font-medium">${status.costPerHr.toFixed(2)}/hr</p>
+                <p className="text-[10px]">cost</p>
+              </div>
+            )}
+            <div className="text-center">
+              <p className="text-text-primary font-medium">{formatUptime(status?.uptimeSeconds ?? null)}</p>
+              <p className="text-[10px]">uptime</p>
+            </div>
+            {status?.proxyUrl && (
+              <a
+                href={status.proxyUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1 text-accent hover:underline"
+              >
+                <Wifi size={12} /> ComfyUI
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* Action button */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {!status?.hasNetworkVolume && isStopped && (
+            <span className="hidden md:flex items-center gap-1 text-[11px] text-amber-400/80">
+              <AlertTriangle size={11} /> Models re-download on start
+            </span>
+          )}
+          {isRunning ? (
+            <button
+              onClick={() => stop.mutate(status?.podId ?? undefined)}
+              disabled={stop.isPending}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-900/30 border border-red-800/50 text-red-400 hover:bg-red-900/50 text-xs font-medium transition-colors disabled:opacity-50"
+            >
+              {stop.isPending ? <Loader2 size={12} className="animate-spin" /> : <Square size={12} />}
+              Stop Pod
+            </button>
+          ) : (
+            <button
+              onClick={() => start.mutate()}
+              disabled={start.isPending || isLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-900/30 border border-green-800/50 text-green-400 hover:bg-green-900/50 text-xs font-medium transition-colors disabled:opacity-50"
+            >
+              {start.isPending ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+              {start.isPending ? "Deploying…" : "Start Pod"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Error display */}
+      {(start.isError || stop.isError) && (
+        <p className="mt-3 text-xs text-red-400 bg-red-950/30 border border-red-900/40 rounded-lg px-3 py-2">
+          {start.error?.message || stop.error?.message}
+        </p>
+      )}
+
+      {/* Startup note */}
+      {start.isSuccess && (
+        <p className="mt-3 text-xs text-amber-400/80 flex items-center gap-1.5">
+          <AlertTriangle size={12} />
+          Pod deployed — ComfyUI takes ~2-3 min to initialize. Use the ComfyUI link above to verify it&apos;s ready before rendering.
+        </p>
+      )}
+    </div>
+  );
+}
 
 // ─── Engine icon + accent config ─────────────────────────────────────────────
 
@@ -21,6 +148,8 @@ const ENGINE_CONFIG: Record<string, {
   openai_sora: { icon: Sparkles,     bg: "bg-emerald-500/10", iconColor: "text-emerald-400", border: "border-emerald-500/25"},
   google_veo:  { icon: Globe,        bg: "bg-amber-500/10",   iconColor: "text-amber-400",   border: "border-amber-500/25"  },
   kling_video: { icon: FlaskConical, bg: "bg-violet-500/10",  iconColor: "text-violet-400",  border: "border-violet-500/25" },
+  fal_wan21:   { icon: Zap,          bg: "bg-orange-500/10",  iconColor: "text-orange-400",  border: "border-orange-500/25" },
+  runpod_wan:  { icon: Server,       bg: "bg-green-500/10",   iconColor: "text-green-400",   border: "border-green-500/25"  },
   local_wan:   { icon: Cpu,          bg: "bg-zinc-500/10",    iconColor: "text-zinc-400",    border: "border-zinc-500/25"   },
 };
 
@@ -325,6 +454,9 @@ export function Engines() {
           </div>
         ))}
       </div>
+
+      {/* RunPod Pod Manager */}
+      <RunPodPanel />
 
       {/* Filter tabs */}
       <div className="flex gap-1 border-b border-border">

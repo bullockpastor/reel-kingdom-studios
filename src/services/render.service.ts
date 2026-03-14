@@ -7,7 +7,7 @@ import { projectShotsDir } from "../storage/studio-root.js";
 import { logger } from "../utils/logger.js";
 
 interface RenderOptions {
-  engine: "local" | "premium";
+  engine: "local" | "runpod_wan" | "premium";
   width: number;
   height: number;
   fps: number;
@@ -36,10 +36,14 @@ export async function queueRender(
   }
 
   // Create render job record
+  const engineLabel =
+    options.engine === "premium" ? "premium" :
+    options.engine === "runpod_wan" ? "runpod_wan" : "comfyui";
+
   const renderJob = await db.renderJob.create({
     data: {
       shotId: shot.id,
-      engine: options.engine === "premium" ? "premium" : "comfyui",
+      engine: engineLabel,
       attempt: shot.qcFailCount + 1,
     },
   });
@@ -49,7 +53,7 @@ export async function queueRender(
     shotId: shot.id,
     renderJobId: renderJob.id,
     projectId: shot.projectId,
-    engine: options.engine === "premium" ? "premium" : "comfyui",
+    engine: engineLabel,
     prompt: shot.prompt,
     negativePrompt: shot.negativePrompt,
     durationSeconds: shot.durationSeconds,

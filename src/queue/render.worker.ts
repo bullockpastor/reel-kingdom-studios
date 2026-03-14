@@ -3,6 +3,8 @@ import { getRedisConnection } from "./connection.js";
 import type { RenderJobData } from "./render.queue.js";
 import { db } from "../db.js";
 import { getLocalRenderer, getPremiumVideoProvider } from "../providers/video/index.js";
+import { ComfyUIRenderer } from "../providers/video/comfyui.renderer.js";
+import { getRunPodStatus } from "../services/runpod.service.js";
 import { runAgent, visualQCAgent } from "../agents/index.js";
 import { shotRenderDir } from "../storage/studio-root.js";
 import { queueRender } from "../services/render.service.js";
@@ -50,6 +52,41 @@ const worker = new Worker<RenderJobData>(
         });
 
         if (!result.success) throw new Error(result.error || "Render failed");
+
+        filePath = result.filePath;
+        durationMs = result.durationMs;
+
+        if (result.promptId) {
+          await db.shot.update({
+            where: { id: data.shotId },
+            data: { comfyuiPromptId: result.promptId },
+          });
+        }
+      } else if (data.engine === "runpod_wan") {
+        // RunPod cloud ComfyUI — same workflow as local, dynamic URL
+        const podStatus = await getRunPodStatus();
+        if (podStatus.state !== "running" || !podStatus.proxyUrl) {
+          throw new Error(
+            "RunPod pod is not running. Start it from the Engines dashboard before rendering."
+          );
+        }
+        const renderer = new ComfyUIRenderer(podStatus.proxyUrl);
+        const renderDir = shotRenderDir(data.projectId, data.shotId, "draft");
+        const result = await renderer.render({
+          shotId: data.shotId,
+          prompt: data.prompt,
+          negativePrompt: data.negativePrompt,
+          durationSeconds: data.durationSeconds,
+          width: data.width,
+          height: data.height,
+          fps: data.fps,
+          steps: data.steps,
+          seed: data.seed,
+          outputDir: renderDir,
+          filenamePrefix: `shot_${data.shotId}`,
+        });
+
+        if (!result.success) throw new Error(result.error || "RunPod render failed");
 
         filePath = result.filePath;
         durationMs = result.durationMs;

@@ -1,4 +1,4 @@
-import type { Project, Shot, HealthResponse, QueueStatus, Presenter, PresenterScript, Engine, ComparisonResult, RouteTableEntry, ResolvedRoute } from "./types";
+import type { Project, Shot, HealthResponse, QueueStatus, Presenter, PresenterScript, Engine, ComparisonResult, RouteTableEntry, ResolvedRoute, RunPodStatus } from "./types";
 
 const BASE = "";
 
@@ -93,6 +93,16 @@ export const api = {
   getPresenter: (id: string) => request<Presenter>(`/presenter/profiles/${id}`),
   updatePresenter: (id: string, data: { name?: string; description?: string; voiceId?: string; defaultProvider?: string; defaultTemplateId?: string }) =>
     request<Presenter>(`/presenter/profiles/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  uploadPresenterImage: async (id: string, file: File): Promise<Presenter> => {
+    const form = new FormData();
+    form.append("image", file);
+    const res = await fetch(`/presenter/profiles/${id}/reference-image`, { method: "POST", body: form });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error((body as { error?: string }).error || `HTTP ${res.status}`);
+    }
+    return res.json() as Promise<Presenter>;
+  },
 
   // Presenter projects
   createPresenterProject: (data: {
@@ -129,6 +139,15 @@ export const api = {
   compareEngines: (data: { prompt: string; engines: string[]; durationSeconds?: number }) =>
     request<ComparisonResult>("/engines/compare", { method: "POST", body: JSON.stringify(data) }),
   getComparison: (id: string) => request<ComparisonResult>(`/engines/compare/${id}`),
+
+  // RunPod
+  runpodStatus: () => request<RunPodStatus>("/runpod/status"),
+  runpodStart: () => request<RunPodStatus>("/runpod/start", { method: "POST", body: JSON.stringify({}) }),
+  runpodStop: (podId?: string) =>
+    request<{ ok: boolean; podId: string; state: string }>("/runpod/stop", {
+      method: "POST",
+      body: JSON.stringify(podId ? { podId } : {}),
+    }),
 
   // Model Router
   listAgentRoutes: () => request<{ routes: RouteTableEntry[] }>("/model-router/routes"),

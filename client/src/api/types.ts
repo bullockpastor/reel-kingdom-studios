@@ -106,6 +106,17 @@ export interface EngineTemplate {
   description: string;
 }
 
+export interface RunPodStatus {
+  state: "running" | "stopped" | "not_configured";
+  podId: string | null;
+  proxyUrl: string | null;
+  costPerHr: number | null;
+  uptimeSeconds: number | null;
+  hasNetworkVolume: boolean;
+  gpuTypeId: string;
+  templateId: string;
+}
+
 export interface Engine {
   key: string;
   label: string;
