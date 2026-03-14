@@ -24,17 +24,18 @@ export async function shotRoutes(app: FastifyInstance) {
     return shot;
   });
 
-  // PATCH /shots/:id — Update shot fields (trimStart, trimEnd)
+  // PATCH /shots/:id — Update shot fields (trimStart, trimEnd, lowerThirdEnabled)
   app.patch("/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const body = (request.body || {}) as { trimStart?: number; trimEnd?: number };
+    const body = (request.body || {}) as { trimStart?: number; trimEnd?: number; lowerThirdEnabled?: boolean };
 
     const shot = await db.shot.findUnique({ where: { id } });
     if (!shot) return reply.status(404).send({ error: "Shot not found" });
 
-    const data: { trimStart?: number; trimEnd?: number } = {};
+    const data: { trimStart?: number; trimEnd?: number; lowerThirdEnabled?: boolean } = {};
     if (typeof body.trimStart === "number" && body.trimStart >= 0) data.trimStart = body.trimStart;
     if (typeof body.trimEnd === "number" && body.trimEnd >= 0) data.trimEnd = body.trimEnd;
+    if (typeof body.lowerThirdEnabled === "boolean") data.lowerThirdEnabled = body.lowerThirdEnabled;
 
     const updated = await db.shot.update({
       where: { id },

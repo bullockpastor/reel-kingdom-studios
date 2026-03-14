@@ -102,7 +102,7 @@ export function useReorderShots() {
 export function useUpdateShot() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ shotId, data }: { shotId: string; data: { trimStart?: number; trimEnd?: number } }) =>
+    mutationFn: ({ shotId, data }: { shotId: string; data: { trimStart?: number; trimEnd?: number; lowerThirdEnabled?: boolean } }) =>
       api.updateShot(shotId, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["project"] });
@@ -143,6 +143,15 @@ export function useUpdatePresenter() {
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof api.updatePresenter>[1] }) =>
       api.updatePresenter(id, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["presenters"] }),
+  });
+}
+
+export function useUpdatePresenterOverlays() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { showLowerThirds?: boolean; showScriptureOverlays?: boolean } }) =>
+      api.updatePresenterOverlays(id, data),
+    onSuccess: (_data, { id }) => qc.invalidateQueries({ queryKey: ["presenterProject", id] }),
   });
 }
 

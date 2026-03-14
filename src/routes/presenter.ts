@@ -326,6 +326,29 @@ export async function presenterRoutes(app: FastifyInstance) {
     }
   });
 
+  // PATCH /presenter/projects/:id/overlays — Update overlay master toggles
+  app.patch("/projects/:id/overlays", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = (request.body || {}) as { showLowerThirds?: boolean; showScriptureOverlays?: boolean };
+
+    const project = await db.project.findUnique({
+      where: { id },
+      include: { presenterScript: true },
+    });
+    if (!project) return reply.status(404).send({ error: "Project not found" });
+    if (!project.presenterScript) return reply.status(400).send({ error: "No presenter script for this project" });
+
+    const data: { showLowerThirds?: boolean; showScriptureOverlays?: boolean } = {};
+    if (typeof body.showLowerThirds === "boolean") data.showLowerThirds = body.showLowerThirds;
+    if (typeof body.showScriptureOverlays === "boolean") data.showScriptureOverlays = body.showScriptureOverlays;
+
+    const updated = await db.presenterScript.update({
+      where: { id: project.presenterScript.id },
+      data,
+    });
+    return reply.send(updated);
+  });
+
   // POST /presenter/projects/:id/produce — Queue all shots for rendering
   app.post("/projects/:id/produce", async (request, reply) => {
     const { id } = request.params as { id: string };

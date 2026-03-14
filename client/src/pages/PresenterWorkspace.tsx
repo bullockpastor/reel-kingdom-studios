@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { usePresenterProject, useDirectPresenterProject, useProducePresenterProject, useAssemble, useAudioLibrary } from "@/api/hooks";
+import { usePresenterProject, useDirectPresenterProject, useProducePresenterProject, useAssemble, useAudioLibrary, useUpdatePresenterOverlays, useUpdateShot } from "@/api/hooks";
 import { StatusBadge } from "@/components/project/StatusBadge";
 import { ShotGrid } from "@/components/project/ShotGrid";
 import { VideoPlayer } from "@/components/project/VideoPlayer";
@@ -46,6 +46,8 @@ export function PresenterWorkspace() {
   const direct = useDirectPresenterProject();
   const produce = useProducePresenterProject();
   const assemble = useAssemble();
+  const updateOverlays = useUpdatePresenterOverlays();
+  const updateShot = useUpdateShot();
   const { data: audioLibrary } = useAudioLibrary();
 
   const [tab, setTab] = useState<Tab>("overview");
@@ -90,6 +92,11 @@ export function PresenterWorkspace() {
 
   const perfByIndex = new Map<number, PerformanceShot>();
   for (const s of perfShots) perfByIndex.set(s.segmentIndex, s);
+
+  const shotBySegmentIndex = new Map<number, typeof shots[0]>();
+  for (const s of shots) {
+    if (s.segmentIndex !== null) shotBySegmentIndex.set(s.segmentIndex, s);
+  }
 
   function toggleVisual(idx: number) {
     setExpandedVisuals((prev) => {
@@ -302,6 +309,41 @@ export function PresenterWorkspace() {
             </div>
           )}
 
+          {/* Overlay Controls */}
+          {ps && (
+            <div className="bg-surface-elevated border border-border rounded-xl p-4 space-y-3">
+              <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Overlay Controls</h3>
+              <div className="space-y-3">
+                {(
+                  [
+                    { key: "showLowerThirds" as const, label: "Lower Thirds", desc: "Name/title bar on presenter shots" },
+                    { key: "showScriptureOverlays" as const, label: "Scripture Overlays", desc: "Bible verse callouts" },
+                  ] as const
+                ).map(({ key, label, desc }) => (
+                  <div key={key} className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm text-text-primary">{label}</p>
+                      <p className="text-xs text-text-muted">{desc}</p>
+                    </div>
+                    <button
+                      onClick={() => updateOverlays.mutate({ id: id!, data: { [key]: !ps[key] } })}
+                      disabled={updateOverlays.isPending}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none disabled:opacity-50 ${
+                        ps[key] ? "bg-accent" : "bg-border"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                          ps[key] ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Shot summary pills */}
           {shots.length > 0 && (
             <div className="space-y-2">
@@ -331,6 +373,7 @@ export function PresenterWorkspace() {
           ) : (
             segments.map((seg) => {
               const perf = perfByIndex.get(seg.index);
+              const shot = shotBySegmentIndex.get(seg.index);
               return (
                 <div
                   key={seg.index}
@@ -379,9 +422,27 @@ export function PresenterWorkspace() {
                         <p className="text-xs text-text-muted font-mono">template: {perf.templateId}</p>
                       )}
                       {perf.lowerThirdTiming?.text && (
-                        <p className="text-xs text-yellow-400">
-                          Lower third: "{perf.lowerThirdTiming.text}" ({perf.lowerThirdTiming.in}s–{perf.lowerThirdTiming.out}s)
-                        </p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs text-yellow-400 truncate min-w-0">
+                            Lower third: "{perf.lowerThirdTiming.text}" ({perf.lowerThirdTiming.in}s–{perf.lowerThirdTiming.out}s)
+                          </p>
+                          {shot && (
+                            <button
+                              onClick={() => updateShot.mutate({ shotId: shot.id, data: { lowerThirdEnabled: !shot.lowerThirdEnabled } })}
+                              disabled={updateShot.isPending}
+                              title={shot.lowerThirdEnabled ? "Disable lower third for this shot" : "Enable lower third for this shot"}
+                              className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none disabled:opacity-50 ${
+                                shot.lowerThirdEnabled ? "bg-yellow-600" : "bg-border"
+                              }`}
+                            >
+                              <span
+                                className={`inline-block h-3 w-3 rounded-full bg-white shadow transition-transform ${
+                                  shot.lowerThirdEnabled ? "translate-x-3" : "translate-x-0"
+                                }`}
+                              />
+                            </button>
+                          )}
+                        </div>
                       )}
                       {perf.scriptureOverlay && (
                         <p className="text-xs text-green-400 italic">Scripture: {perf.scriptureOverlay}</p>

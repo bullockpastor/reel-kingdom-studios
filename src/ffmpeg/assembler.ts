@@ -1,9 +1,127 @@
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import { promisify } from "node:util";
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
 
 const execFileAsync = promisify(execFile);
+
+// ─── Overlay helpers ───────────────────────────────────────────────────────
+
+/** Escape a string for use in an FFmpeg drawtext `text=` value. */
+function escapeDrawtext(text: string): string {
+  return text
+    .replace(/\\/g, "\\\\")  // backslash
+    .replace(/'/g, "\\'")     // single quote
+    .replace(/:/g, "\\:")     // colon (FFmpeg filter separator)
+    .replace(/\n/g, " ");     // newlines → space
+}
+
+/**
+ * Resolve the overlay font path, trying config value then common fallbacks.
+ * Returns null if no usable font is found.
+ */
+function resolveOverlayFont(): string | null {
+  const candidates = [
+    config.OVERLAY_FONT_PATH,
+    "/System/Library/Fonts/Supplemental/Arial.ttf",
+    "/Library/Fonts/Arial.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+  ];
+  for (const p of candidates) {
+    if (p && existsSync(p)) return p;
+  }
+  return null;
+}
+
+/**
+ * Build FFmpeg drawtext (and drawbox) filter expressions for all overlay events
+ * across all shots in the assembled video.
+ *
+ * @param shots       - Ordered assembly shots with their overlay data
+ * @param startTimes  - Cumulative start time (seconds) of each shot in the final video
+ * @param showLowerThirds
+ * @param showScriptureOverlays
+ * @returns Array of FFmpeg filter strings to chain after the last video step, or [] if none needed.
+ */
+function buildOverlayFilters(
+  shots: AssemblyShot[],
+  startTimes: number[],
+  showLowerThirds: boolean,
+  showScriptureOverlays: boolean
+): string[] {
+  const font = resolveOverlayFont();
+  if (!font) {
+    logger.warn("No overlay font found — lower thirds and scripture overlays will be skipped");
+    return [];
+  }
+
+  const filters: string[] = [];
+  const fontAttr = `fontfile='${font}'`;
+
+  for (let i = 0; i < shots.length; i++) {
+    const shot = shots[i];
+    const t0 = startTimes[i];
+    const effectiveDuration =
+      (shot.durationSeconds - shot.trimStart - shot.trimEnd) / shot.speedFactor;
+
+    // ── Lower third ──
+    if (
+      showLowerThirds &&
+      shot.lowerThirdEnabled !== false &&
+      shot.lowerThird?.text
+    ) {
+      const lt = shot.lowerThird;
+      const tIn = (t0 + lt.in).toFixed(3);
+      const tOut = (t0 + lt.out).toFixed(3);
+      const enableExpr = `between(t,${tIn},${tOut})`;
+
+      // Parse "Name | Title" or just "Name"
+      const parts = lt.text.split(" | ");
+      const nameLine = escapeDrawtext(parts[0].trim());
+      const titleLine = parts[1] ? escapeDrawtext(parts[1].trim()) : null;
+
+      // Semi-transparent bar
+      const barH = titleLine ? 82 : 54;
+      filters.push(
+        `drawbox=x=0:y=h-${barH + 20}:w=iw:h=${barH}:color=black@0.55:t=fill:enable='${enableExpr}'`
+      );
+      // Name line
+      filters.push(
+        `drawtext=${fontAttr}:fontsize=26:fontcolor=white:x=56:y=h-${barH + 4}:text='${nameLine}':enable='${enableExpr}'`
+      );
+      // Title line (if present)
+      if (titleLine) {
+        filters.push(
+          `drawtext=${fontAttr}:fontsize=18:fontcolor=0xCCCCCC:x=56:y=h-${barH - 32}:text='${titleLine}':enable='${enableExpr}'`
+        );
+      }
+    }
+
+    // ── Scripture overlay ──
+    if (showScriptureOverlays && shot.scriptureOverlay) {
+      // Show for the middle portion of the shot (0.5s in, 0.5s before end)
+      const tIn = (t0 + 0.5).toFixed(3);
+      const tOut = (t0 + Math.max(effectiveDuration - 0.5, 1.0)).toFixed(3);
+      const enableExpr = `between(t,${tIn},${tOut})`;
+      const text = escapeDrawtext(shot.scriptureOverlay);
+
+      // Dark pill background
+      filters.push(
+        `drawbox=x=(iw-600)/2:y=(ih)/2+60:w=600:h=52:color=black@0.6:t=fill:enable='${enableExpr}'`
+      );
+      // Scripture text centered
+      filters.push(
+        `drawtext=${fontAttr}:fontsize=22:fontcolor=white:x=(w-text_w)/2:y=h/2+72:text='${text}':enable='${enableExpr}'`
+      );
+    }
+  }
+
+  return filters;
+}
+
+// ─── Reframe + transitions ──────────────────────────────────────────────────
 
 const TRANSITION_MAP: Record<string, string> = {
   crossfade: "fade",
@@ -22,6 +140,10 @@ export interface AssemblyShot {
   speedFactor: number;
   reframeFocus: string;   // center | left | right | upper | lower
   reframePan: string;     // none | slow_ltr | slow_rtl
+  // Presenter overlays (optional — ignored for cinematic shots)
+  lowerThirdEnabled?: boolean;
+  lowerThird?: { text: string; in: number; out: number } | null;
+  scriptureOverlay?: string | null;
 }
 
 export interface AssemblyOptions {
@@ -37,6 +159,9 @@ export interface AssemblyOptions {
   /** Optional background music — mixed at reduced volume */
   backgroundMusicPath?: string;
   backgroundMusicVolume?: number;  // 0-1, default 0.2
+  /** Presenter overlay master toggles */
+  showLowerThirds?: boolean;
+  showScriptureOverlays?: boolean;
 }
 
 /**
@@ -136,7 +261,13 @@ export async function assembleVideo(options: AssemblyOptions): Promise<void> {
     primaryAudioPath,
     backgroundMusicPath,
     backgroundMusicVolume = 0.2,
+    showLowerThirds = false,
+    showScriptureOverlays = false,
   } = options;
+
+  const needsOverlays = (showLowerThirds || showScriptureOverlays) &&
+    shots.some((s) => (showLowerThirds && s.lowerThird?.text && s.lowerThirdEnabled !== false) ||
+                      (showScriptureOverlays && s.scriptureOverlay));
 
   if (shots.length === 0) throw new Error("No shots to assemble");
 
@@ -157,6 +288,11 @@ export async function assembleVideo(options: AssemblyOptions): Promise<void> {
       );
       if (reframe) filters.push(reframe);
       filters.push(`scale=${targetWidth}:${targetHeight}`);
+    }
+
+    if (needsOverlays) {
+      const overlayFilters = buildOverlayFilters(shots, [0], showLowerThirds, showScriptureOverlays);
+      filters.push(...overlayFilters);
     }
 
     const args = ["-i", s.filePath];
@@ -190,8 +326,9 @@ export async function assembleVideo(options: AssemblyOptions): Promise<void> {
     }
   }
 
-  // Build xfade chain
+  // Build xfade chain — track per-shot start times for overlay timing
   const xfadeParts: string[] = [];
+  const shotStartTimes: number[] = new Array(shots.length).fill(0);
   let cumulativeOffset = 0;
 
   for (let i = 0; i < shots.length - 1; i++) {
@@ -205,20 +342,34 @@ export async function assembleVideo(options: AssemblyOptions): Promise<void> {
     const effectiveDuration =
       (shots[i].durationSeconds - shots[i].trimStart - shots[i].trimEnd) / shots[i].speedFactor;
     cumulativeOffset += effectiveDuration - dur;
+    shotStartTimes[i + 1] = cumulativeOffset;
 
     xfadeParts.push(
       `${inputA}${inputB}xfade=transition=${transition}:duration=${dur}:offset=${cumulativeOffset.toFixed(3)}${outputLabel}`
     );
   }
 
-  const filterComplex = [...preFilters, ...xfadeParts].join(";");
+  // Append overlay filters after the final xfade step
+  const overlayFilterParts: string[] = [];
+  if (needsOverlays) {
+    overlayFilterParts.push(
+      ...buildOverlayFilters(shots, shotStartTimes, showLowerThirds, showScriptureOverlays)
+    );
+  }
+
+  const finalVideoLabel = needsOverlays && overlayFilterParts.length > 0 ? "[vout]" : "[vfinal]";
+  const overlayChain = overlayFilterParts.length > 0
+    ? `;[vfinal]${overlayFilterParts.join(",")}[vout]`
+    : "";
+
+  const filterComplex = [...preFilters, ...xfadeParts].join(";") + overlayChain;
 
   const args = [
     ...inputs,
     "-filter_complex",
     filterComplex,
     "-map",
-    "[vfinal]",
+    finalVideoLabel,
     "-c:v",
     "libx264",
     "-pix_fmt",

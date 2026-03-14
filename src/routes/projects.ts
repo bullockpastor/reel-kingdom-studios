@@ -251,7 +251,8 @@ export async function projectRoutes(app: FastifyInstance) {
         project.storyboard,
         body.transitionDuration,
         body.outputFormat,
-        audioPaths
+        audioPaths,
+        project.presenterScript ?? null
       );
       return reply.send(result);
     } catch (err) {

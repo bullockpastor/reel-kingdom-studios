@@ -52,7 +52,7 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ shotIds }),
     }),
-  updateShot: (shotId: string, data: { trimStart?: number; trimEnd?: number }) =>
+  updateShot: (shotId: string, data: { trimStart?: number; trimEnd?: number; lowerThirdEnabled?: boolean }) =>
     request<Shot>(`/shots/${shotId}`, {
       method: "PATCH",
       body: JSON.stringify(data),
@@ -122,6 +122,9 @@ export const api = {
       { method: "POST", body: JSON.stringify(data) }
     ),
   getPresenterProject: (id: string) => request<Project>(`/presenter/projects/${id}`),
+  updatePresenterOverlays: (id: string, data: { showLowerThirds?: boolean; showScriptureOverlays?: boolean }) =>
+    request<PresenterScript>(`/presenter/projects/${id}/overlays`, { method: "PATCH", body: JSON.stringify(data) }),
+
   directPresenterProject: (id: string, data?: { rawScript?: string }) =>
     request<{ presenterScript: PresenterScript; shots: Shot[]; agentResults: unknown[] }>(
       `/presenter/projects/${id}/direct`,

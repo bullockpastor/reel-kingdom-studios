@@ -51,6 +51,9 @@ const configSchema = z.object({
   GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
 
   FFMPEG_PATH: z.string().default("ffmpeg"),
+  // Font used for lower-third and scripture overlay drawtext filters.
+  // Override with any TTF/OTF on the system.
+  OVERLAY_FONT_PATH: z.string().default("/System/Library/Fonts/Supplemental/Arial.ttf"),
   DEFAULT_TRANSITION_DURATION: z.coerce.number().default(0.5),
   DEFAULT_OUTPUT_FORMAT: z.enum(["mp4", "webm"]).default("mp4"),
 

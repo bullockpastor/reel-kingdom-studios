@@ -20,6 +20,8 @@ const worker = new Worker<AssemblyJobData>(
       await assembleVideo({
         primaryAudioPath: data.primaryAudioPath,
         backgroundMusicPath: data.backgroundMusicPath,
+        showLowerThirds: data.showLowerThirds ?? false,
+        showScriptureOverlays: data.showScriptureOverlays ?? false,
         shots: data.shots.map((s) => ({
           filePath: s.filePath,
           durationSeconds: s.durationSeconds,
@@ -30,6 +32,9 @@ const worker = new Worker<AssemblyJobData>(
           speedFactor: s.speedFactor,
           reframeFocus: s.reframeFocus,
           reframePan: s.reframePan,
+          lowerThirdEnabled: s.lowerThirdEnabled,
+          lowerThird: s.lowerThird,
+          scriptureOverlay: s.scriptureOverlay,
         })),
         outputPath: data.outputPath,
         outputFormat: data.outputFormat,

@@ -42,6 +42,7 @@ export interface Shot {
   scriptSegmentJson: string | null;
   segmentIndex: number | null;
   templateId: string | null;
+  lowerThirdEnabled: boolean;
   createdAt: string;
   updatedAt: string;
   renderJobs?: RenderJob[];
@@ -103,6 +104,8 @@ export interface PresenterScript {
   deliveryMode: string;
   templateId: string | null;
   selectedProvider: string | null;
+  showLowerThirds: boolean;
+  showScriptureOverlays: boolean;
   status: string;
   createdAt: string;
   updatedAt: string;

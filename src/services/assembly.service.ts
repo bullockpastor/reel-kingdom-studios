@@ -1,4 +1,4 @@
-import type { Project, Shot, Storyboard } from "@prisma/client";
+import type { Project, Shot, Storyboard, PresenterScript, Presenter } from "@prisma/client";
 import { join } from "node:path";
 import { assemblyQueue } from "../queue/assembly.queue.js";
 import { runAgent, editorAssemblerAgent } from "../agents/index.js";
@@ -12,7 +12,8 @@ export async function queueAssembly(
   storyboard: Storyboard | null,
   transitionDuration?: number,
   outputFormat?: "mp4" | "webm",
-  audioPaths?: { primaryAudioPath?: string; backgroundMusicPath?: string }
+  audioPaths?: { primaryAudioPath?: string; backgroundMusicPath?: string },
+  presenterScript?: (PresenterScript & { presenter: Presenter }) | null
 ) {
   const format = outputFormat || (config.DEFAULT_OUTPUT_FORMAT as "mp4" | "webm");
   const outputDir = projectOutputDir(project.id);
@@ -57,10 +58,26 @@ export async function queueAssembly(
     totalDurationSeconds: number;
   };
 
+  // Build presenter overlay lookup map if this is a presenter project
+  interface PerfShot { segmentIndex: number; lowerThirdTiming?: { in: number; out: number; text: string } | null; scriptureOverlay?: string | null }
+  let perfShotMap = new Map<number, PerfShot>();
+  if (presenterScript) {
+    try {
+      const spec = JSON.parse(presenterScript.performanceSpec) as { shots?: PerfShot[] };
+      for (const ps of spec.shots ?? []) {
+        perfShotMap.set(ps.segmentIndex, ps);
+      }
+    } catch { /* ignore parse errors */ }
+  }
+
   // Map edit plan to assembly queue data (use shot trim override when set)
   const assemblyShots = shots.map((shot) => {
     const plan = editPlan.editPlan.find((p) => p.shotIndex === shot.shotIndex);
     const hasTrimOverride = (shot.trimStart ?? 0) > 0 || (shot.trimEnd ?? 0) > 0;
+
+    // Resolve presenter overlay data for this shot
+    const perfShot = presenterScript ? perfShotMap.get(shot.segmentIndex ?? shot.shotIndex) : null;
+
     return {
       shotId: shot.id,
       shotIndex: shot.shotIndex,
@@ -73,6 +90,9 @@ export async function queueAssembly(
       speedFactor: plan?.speedFactor ?? 1.0,
       reframeFocus: plan?.reframeFocus ?? shot.reframeFocus,
       reframePan: plan?.reframePan ?? shot.reframePan,
+      lowerThirdEnabled: shot.lowerThirdEnabled ?? true,
+      lowerThird: perfShot?.lowerThirdTiming ?? null,
+      scriptureOverlay: perfShot?.scriptureOverlay ?? null,
     };
   });
 
@@ -88,6 +108,8 @@ export async function queueAssembly(
     shots: assemblyShots,
     primaryAudioPath: audioPaths?.primaryAudioPath,
     backgroundMusicPath: audioPaths?.backgroundMusicPath,
+    showLowerThirds: presenterScript?.showLowerThirds ?? false,
+    showScriptureOverlays: presenterScript?.showScriptureOverlays ?? false,
   });
 
   logger.info({ projectId: project.id, jobId: job.id }, "Assembly job queued");
