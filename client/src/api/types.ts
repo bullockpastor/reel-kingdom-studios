@@ -115,6 +115,20 @@ export interface PresenterScript {
   presenter?: Presenter;
 }
 
+export interface ElevenLabsVoice {
+  id: string;
+  name: string;
+  category: string;
+  description: string | null;
+  previewUrl: string;
+}
+
+export interface VoicesResponse {
+  configured: boolean;
+  voices: ElevenLabsVoice[];
+  error?: string;
+}
+
 export interface EngineTemplate {
   id: string;
   name: string;

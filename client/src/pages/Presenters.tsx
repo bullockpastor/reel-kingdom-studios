@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { usePresenters, usePresenterTemplates, useCreatePresenter, useCreatePresenterProject, useUpdatePresenter, useUploadPresenterImage } from "@/api/hooks";
 import { StatusBadge } from "@/components/project/StatusBadge";
+import { VoiceSelector } from "@/components/presenter/VoiceSelector";
 import { timeAgo } from "@/lib/utils";
 import { Plus, Loader2, Video, User, ChevronDown, ChevronUp, Pencil, Check, X, ImagePlus, CheckCircle2 } from "lucide-react";
 import type { Presenter, PresenterTemplate } from "@/api/types";
@@ -275,13 +276,11 @@ export function Presenters() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-text-muted mb-1">Voice ID (Phase 2 TTS)</label>
-                <input
-                  type="text"
-                  placeholder="elevenlabs:xxx"
+                <label className="block text-xs font-medium text-text-muted mb-1">Voice (ElevenLabs TTS)</label>
+                <VoiceSelector
                   value={presenterForm.voiceId}
-                  onChange={(e) => setPresenterForm((f) => ({ ...f, voiceId: e.target.value }))}
-                  className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:border-accent"
+                  onChange={(id) => setPresenterForm((f) => ({ ...f, voiceId: id }))}
+                  className="w-full"
                 />
               </div>
             </div>
@@ -531,13 +530,11 @@ function PresenterCard({ presenter, templates, onNewProject }: { presenter: Pres
           </div>
         </div>
         <div>
-          <label className="block text-xs text-text-muted mb-1">Voice ID (ElevenLabs)</label>
-          <input
-            type="text"
-            placeholder="e.g. 21m00Tcm4TlvDq8ikWAM"
+          <label className="block text-xs text-text-muted mb-1">Voice (ElevenLabs)</label>
+          <VoiceSelector
             value={editForm.voiceId}
-            onChange={(e) => setEditForm((f) => ({ ...f, voiceId: e.target.value }))}
-            className="w-full px-2 py-1.5 bg-surface border border-border rounded text-sm text-text-primary font-mono focus:outline-none focus:border-accent"
+            onChange={(id) => setEditForm((f) => ({ ...f, voiceId: id }))}
+            className="w-full"
           />
         </div>
         <div>

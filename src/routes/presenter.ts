@@ -20,6 +20,47 @@ function toAssetUrl(absolutePath: string | null): string | null {
 
 export async function presenterRoutes(app: FastifyInstance) {
 
+  // ─── ElevenLabs Voices ───────────────────────────────────────────────────
+
+  // GET /presenter/voices — Fetch available ElevenLabs voices for voice picker
+  app.get("/voices", async () => {
+    const apiKey = config.ELEVENLABS_API_KEY;
+    if (!apiKey) {
+      return { configured: false, voices: [] };
+    }
+    try {
+      const resp = await fetch("https://api.elevenlabs.io/v1/voices", {
+        headers: { "xi-api-key": apiKey },
+      });
+      if (!resp.ok) throw new Error(`ElevenLabs API error: ${resp.status}`);
+      const data = await resp.json() as {
+        voices: Array<{
+          voice_id: string;
+          name: string;
+          category: string;
+          description: string | null;
+          preview_url: string;
+        }>;
+      };
+      return {
+        configured: true,
+        voices: data.voices.map((v) => ({
+          id: v.voice_id,
+          name: v.name,
+          category: v.category,
+          description: v.description ?? null,
+          previewUrl: v.preview_url,
+        })),
+      };
+    } catch (err) {
+      return {
+        configured: true,
+        voices: [],
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  });
+
   // ─── Presenter Profiles ───────────────────────────────────────────────────
 
   // GET /presenter/profiles — List all presenter profiles

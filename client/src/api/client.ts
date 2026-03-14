@@ -1,4 +1,4 @@
-import type { Project, Shot, HealthResponse, QueueStatus, Presenter, PresenterScript, PresenterTemplate, Engine, ComparisonResult, RouteTableEntry, ResolvedRoute, RunPodStatus } from "./types";
+import type { Project, Shot, HealthResponse, QueueStatus, Presenter, PresenterScript, PresenterTemplate, Engine, ComparisonResult, RouteTableEntry, ResolvedRoute, RunPodStatus, VoicesResponse } from "./types";
 
 const BASE = "";
 
@@ -85,6 +85,9 @@ export const api = {
 
   // Asset URL helper
   assetUrl: (relativePath: string) => `/assets/${relativePath}`,
+
+  // Presenter voices
+  listVoices: () => request<VoicesResponse>("/presenter/voices"),
 
   // Presenter template catalog
   listPresenterTemplates: () => request<PresenterTemplate[]>("/presenter/templates"),

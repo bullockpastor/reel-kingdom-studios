@@ -129,6 +129,14 @@ export function usePresenterTemplates() {
   return useQuery({ queryKey: ["presenterTemplates"], queryFn: api.listPresenterTemplates, staleTime: Infinity });
 }
 
+export function useElevenLabsVoices() {
+  return useQuery({
+    queryKey: ["voices"],
+    queryFn: api.listVoices,
+    staleTime: 5 * 60 * 1000, // cache for 5 min — voice list rarely changes
+  });
+}
+
 export function usePresenters() {
   return useQuery({ queryKey: ["presenters"], queryFn: api.listPresenters });
 }
