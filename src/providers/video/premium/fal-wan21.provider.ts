@@ -5,6 +5,7 @@ import type {
   PremiumRenderCapabilities,
 } from "./premium.types.js";
 import { downloadVideoFile, sleep, msElapsed } from "./download.utils.js";
+import { fetchWithRetry } from "../../../utils/retry.js";
 import { config } from "../../../config.js";
 import { logger } from "../../../utils/logger.js";
 
@@ -106,7 +107,7 @@ export class FalWan21Provider implements IPremiumVideoProvider {
     if (req.seed !== undefined) body.seed = req.seed;
 
     // Submit job
-    const submitResp = await fetch(`${FAL_BASE}/${FAL_MODEL}`, {
+    const submitResp = await fetchWithRetry(`${FAL_BASE}/${FAL_MODEL}`, {
       method: "POST",
       headers: this.postHeaders(),
       body: JSON.stringify(body),
@@ -138,7 +139,7 @@ export class FalWan21Provider implements IPremiumVideoProvider {
     while (Date.now() < deadline) {
       await sleep(POLL_INTERVAL_MS);
 
-      const statusResp = await fetch(statusUrl, { headers: this.getHeaders() });
+      const statusResp = await fetchWithRetry(statusUrl, { headers: this.getHeaders() });
 
       if (!statusResp.ok) {
         return {
@@ -154,7 +155,7 @@ export class FalWan21Provider implements IPremiumVideoProvider {
 
       if (status.status === "COMPLETED") {
         // Fetch result using the response_url from the queue submission
-        const resultResp = await fetch(responseUrl, { headers: this.getHeaders() });
+        const resultResp = await fetchWithRetry(responseUrl, { headers: this.getHeaders() });
 
         if (!resultResp.ok) {
           return {

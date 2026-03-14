@@ -116,7 +116,7 @@ async function runAnthropicVisionQC(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: config.VISUAL_QC_MODEL ?? "claude-sonnet-4-20250514",
+        model: config.VISUAL_QC_MODEL ?? "claude-haiku-4-5-20251001",
         max_tokens: 1024,
         system: QC_SYSTEM_PROMPT,
         messages: [{ role: "user", content }],
