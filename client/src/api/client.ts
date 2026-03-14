@@ -65,6 +65,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(opts || {}),
     }),
+  restoreRender: (shotId: string, renderJobId: string) =>
+    request<Shot>(`/shots/${shotId}/restore`, {
+      method: "POST",
+      body: JSON.stringify({ renderJobId }),
+    }),
 
   // Queue
   queueStatus: () => request<QueueStatus>("/queue"),

@@ -85,6 +85,7 @@ model RenderJob {
   completedAt  DateTime?
   errorMessage String?
   durationMs   Int?
+  renderPath   String?
   createdAt    DateTime  @default(now())
 }
 

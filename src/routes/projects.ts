@@ -97,6 +97,10 @@ export async function projectRoutes(app: FastifyInstance) {
       shots: project.shots.map((s) => ({
         ...s,
         renderUrl: toAssetUrl(s.renderPath),
+        renderJobs: s.renderJobs.map((rj) => ({
+          ...rj,
+          renderUrl: toAssetUrl(rj.renderPath),
+        })),
       })),
     };
   });

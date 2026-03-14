@@ -3,6 +3,13 @@ import { db } from "../db.js";
 import { queueRender } from "../services/render.service.js";
 import { config } from "../config.js";
 
+function toAssetUrl(absolutePath: string | null | undefined): string | null {
+  if (!absolutePath) return null;
+  const prefix = config.STUDIO_ROOT.endsWith("/") ? config.STUDIO_ROOT : config.STUDIO_ROOT + "/";
+  if (!absolutePath.startsWith(prefix)) return null;
+  return "/assets/" + absolutePath.slice(prefix.length);
+}
+
 export async function shotRoutes(app: FastifyInstance) {
   // GET /shots/:id — Single shot with render history
   app.get("/:id", async (request, reply) => {
@@ -21,7 +28,14 @@ export async function shotRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: "Shot not found" });
     }
 
-    return shot;
+    return {
+      ...shot,
+      renderUrl: toAssetUrl(shot.renderPath),
+      renderJobs: shot.renderJobs.map((rj) => ({
+        ...rj,
+        renderUrl: toAssetUrl(rj.renderPath),
+      })),
+    };
   });
 
   // PATCH /shots/:id — Update shot fields (trimStart, trimEnd, lowerThirdEnabled)
@@ -104,5 +118,44 @@ export async function shotRoutes(app: FastifyInstance) {
       const message = err instanceof Error ? err.message : "Render failed";
       return reply.status(500).send({ error: message });
     }
+  });
+
+  // POST /shots/:id/restore — Restore a previous render from history
+  app.post("/:id/restore", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { renderJobId } = (request.body || {}) as { renderJobId?: string };
+
+    if (!renderJobId) {
+      return reply.status(400).send({ error: "renderJobId is required" });
+    }
+
+    const renderJob = await db.renderJob.findUnique({ where: { id: renderJobId } });
+    if (!renderJob || renderJob.shotId !== id) {
+      return reply.status(404).send({ error: "Render job not found for this shot" });
+    }
+    if (!renderJob.renderPath) {
+      return reply.status(400).send({ error: "This render job has no saved render file" });
+    }
+
+    const updated = await db.shot.update({
+      where: { id },
+      data: {
+        renderPath: renderJob.renderPath,
+        renderEngine: renderJob.engine,
+        status: "rendered",
+      },
+      include: {
+        renderJobs: { orderBy: { createdAt: "desc" } },
+      },
+    });
+
+    return {
+      ...updated,
+      renderUrl: toAssetUrl(updated.renderPath),
+      renderJobs: updated.renderJobs.map((rj) => ({
+        ...rj,
+        renderUrl: toAssetUrl(rj.renderPath),
+      })),
+    };
   });
 }

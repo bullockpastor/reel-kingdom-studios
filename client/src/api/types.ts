@@ -69,6 +69,9 @@ export interface RenderJob {
   completedAt: string | null;
   errorMessage: string | null;
   durationMs: number | null;
+  renderPath?: string | null;
+  renderUrl?: string | null;
+  progress?: number | null;
   createdAt: string;
   shot?: { shotIndex: number; projectId: string; prompt: string };
 }

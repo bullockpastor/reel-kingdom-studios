@@ -111,6 +111,18 @@ export function useUpdateShot() {
   });
 }
 
+export function useRestoreRender() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ shotId, renderJobId }: { shotId: string; renderJobId: string }) =>
+      api.restoreRender(shotId, renderJobId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["project"] });
+      qc.invalidateQueries({ queryKey: ["presenterProject"] });
+    },
+  });
+}
+
 // ─── Presenter hooks ──────────────────────────────────────────────────────
 
 export function usePresenterTemplates() {

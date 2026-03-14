@@ -14,6 +14,16 @@ import { join } from "node:path";
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
 
+const ENGINE_ESTIMATED_MS: Record<string, number> = {
+  comfyui: 1_800_000,
+  runpod_wan: 120_000,
+  runway_gen4: 120_000,
+  openai_sora: 180_000,
+  fal_wan21: 60_000,
+  kling_video: 90_000,
+  google_veo: 120_000,
+};
+
 const worker = new Worker<RenderJobData>(
   "render",
   async (job) => {
@@ -30,10 +40,23 @@ const worker = new Worker<RenderJobData>(
       data: { status: "rendering" },
     });
 
+    await job.updateProgress(2); // job started
+
     let filePath: string | undefined;
     let durationMs = 0;
 
+    // Timer-based progress updates (15 → 85%) during render
+    const renderStartTime = Date.now();
+    const estimatedMs = ENGINE_ESTIMATED_MS[data.engine] ?? 120_000;
+    const progressTimer = setInterval(() => {
+      const elapsed = Date.now() - renderStartTime;
+      const pct = Math.min(15 + Math.floor((elapsed / estimatedMs) * 70), 85);
+      job.updateProgress(pct).catch(() => {});
+    }, 5_000);
+
     try {
+      await job.updateProgress(15); // submitted, waiting on provider
+
       if (data.engine === "comfyui") {
         const renderer = getLocalRenderer();
         const renderDir = shotRenderDir(data.projectId, data.shotId, "draft");
@@ -137,6 +160,9 @@ const worker = new Worker<RenderJobData>(
         });
       }
 
+      clearInterval(progressTimer);
+      await job.updateProgress(88); // render done, QC starting
+
       // ── Visual QC: vision-based (if configured) + metadata agent fallback ──
       type QCOutput = {
         pass: boolean;
@@ -202,7 +228,7 @@ const worker = new Worker<RenderJobData>(
       // Update render job as complete
       await db.renderJob.update({
         where: { id: data.renderJobId },
-        data: { status: "completed", completedAt: new Date(), durationMs },
+        data: { status: "completed", completedAt: new Date(), durationMs, renderPath: filePath },
       });
 
       // Handle QC result
@@ -266,6 +292,7 @@ const worker = new Worker<RenderJobData>(
         logger.info({ shotId: data.shotId, qcScore }, "Shot rendered and QC passed");
       }
     } catch (err) {
+      clearInterval(progressTimer);
       const errorMessage = err instanceof Error ? err.message : String(err);
       await db.renderJob.update({
         where: { id: data.renderJobId },
